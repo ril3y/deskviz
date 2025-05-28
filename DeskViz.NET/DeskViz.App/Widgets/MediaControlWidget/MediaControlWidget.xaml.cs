@@ -237,7 +237,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
                     RefreshData();
                     
                     // Update volume progress bar after layout is loaded
-                    Dispatcher.BeginInvoke(new Action(() => UpdateVolumeProgressBar()), 
+                    _ = Dispatcher.BeginInvoke(new Action(() => UpdateVolumeProgressBar()), 
                         System.Windows.Threading.DispatcherPriority.Loaded);
                 }
                 else

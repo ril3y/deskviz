@@ -98,3 +98,6 @@ X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0
 X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.App.pdb
 X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.App.genruntimeconfig.cache
 X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0.19041.0\ref\DeskViz.App.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0.19041.0\Views\AboutWindow.baml
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\obj\Debug\net8.0-windows10.0.19041.0\Views\AboutWindow.g.cs
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\bin\Debug\net8.0-windows10.0.19041.0\Resources\AppIcon.ico

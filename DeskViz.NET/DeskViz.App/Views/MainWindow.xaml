@@ -14,7 +14,8 @@
         WindowStartupLocation="Manual"
         Loaded="Window_Loaded"
         KeyDown="Window_KeyDown"
-        AllowsTransparency="True">
+        AllowsTransparency="True"
+        ShowInTaskbar="False">
     
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />

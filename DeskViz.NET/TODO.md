@@ -52,14 +52,14 @@
 - [ ] Implement drag-and-drop support for widget reordering
 - [ ] Add widget visibility toggling
 - [ ] Create custom layout persistence
-- [ ] Add system tray icon with quick actions
-  - [ ] Create notification area (system tray) icon using app icon
-  - [ ] Implement right-click context menu with options:
-    - [ ] "Widget Settings" - opens main settings window
-    - [ ] "About" - shows app version and information
-    - [ ] "Exit" - closes the application
-  - [ ] Add option to minimize to tray instead of taskbar
-  - [ ] Show/hide main window on tray icon double-click
+- [x] Add system tray icon with quick actions
+  - [x] Create notification area (system tray) icon using app icon
+  - [x] Implement right-click context menu with options:
+    - [x] "Widget Settings" - opens main settings window
+    - [x] "About" - shows app version and information
+    - [x] "Exit" - closes the application
+  - [x] Add option to minimize to tray instead of taskbar
+  - [x] Show/hide main window on tray icon double-click
 - [ ] Create a widget marketplace concept
 - [ ] Implement widget settings persistence per plugin
 - [ ] Add a widget development SDK
@@ -110,6 +110,8 @@
 *   GPU Widget: Displays GPU info (Name, Usage %, Temperature, Memory, Clock Speed, Power) with multi-GPU selection.
 *   GPU Widget Settings: Allows toggling display of temperature, power, memory, clock speed and GPU selection.
 *   Context Menus: Right-click on widgets to open their configuration dialogs.
+*   System Tray: Minimize to tray, double-click to show/hide, context menu with Settings/About/Exit options.
+*   About Window: Displays application version, copyright, and system information.
 
 ## Theming/Styling
 *   Add padding/margin between widgets for better visual separation.

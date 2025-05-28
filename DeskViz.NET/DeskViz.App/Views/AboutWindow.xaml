@@ -1,0 +1,96 @@
+<Window x:Class="DeskViz.App.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="About DeskViz" 
+        Height="400" 
+        Width="500"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+    
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header with Logo -->
+        <Border Grid.Row="0" Background="#2A2A2A" Padding="20">
+            <StackPanel HorizontalAlignment="Center">
+                <Image Source="/Resources/deskviz.png" Height="80" Width="80" Margin="0,0,0,10"/>
+                <TextBlock Text="DeskViz" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="VersionText" Text="Version 1.0.0" FontSize="14" Foreground="#B0B0B0" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20">
+            <StackPanel>
+                <TextBlock Text="About" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+                <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="#B0B0B0">
+                    DeskViz is a modern system monitoring widget application designed to provide real-time information about your computer's performance in a beautiful and customizable interface.
+                </TextBlock>
+                
+                <TextBlock Text="Features" FontSize="18" FontWeight="Bold" Margin="0,20,0,10"/>
+                <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="#B0B0B0">
+                    • Real-time CPU, RAM, and GPU monitoring
+                    <LineBreak/>
+                    • Customizable widgets and layouts
+                    <LineBreak/>
+                    • Multi-monitor support
+                    <LineBreak/>
+                    • Media control integration
+                    <LineBreak/>
+                    • System tray functionality
+                    <LineBreak/>
+                    • Dark theme optimized for always-on displays
+                </TextBlock>
+                
+                <TextBlock Text="Credits" FontSize="18" FontWeight="Bold" Margin="0,20,0,10"/>
+                <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="#B0B0B0">
+                    Built with .NET 8.0 and WPF
+                    <LineBreak/>
+                    Hardware monitoring powered by LibreHardwareMonitor
+                </TextBlock>
+                
+                <TextBlock Text="License" FontSize="18" FontWeight="Bold" Margin="0,20,0,10"/>
+                <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="#B0B0B0">
+                    © 2024 DeskViz Team. All rights reserved.
+                </TextBlock>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Footer with buttons -->
+        <Border Grid.Row="2" Background="#2A2A2A" Padding="20,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="https://github.com/ril3y/DeskViz" 
+                          Foreground="#4FC3F7" VerticalAlignment="Center" Cursor="Hand"
+                          MouseLeftButtonUp="GitHubLink_Click"/>
+                
+                <Button Grid.Column="1" Content="System Info" Width="100" Height="30" Margin="0,0,10,0"
+                        Background="#333333" Foreground="White" BorderBrush="#555555"
+                        Click="SystemInfoButton_Click"/>
+                
+                <Button Grid.Column="2" Content="OK" Width="80" Height="30" IsDefault="True"
+                        Background="#4FC3F7" Foreground="White" BorderBrush="#4FC3F7"
+                        Click="OKButton_Click"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

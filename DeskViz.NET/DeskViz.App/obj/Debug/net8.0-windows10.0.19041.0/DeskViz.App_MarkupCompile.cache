@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
 X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.App\App.xaml
-15-1506973177
+16-386968912
 1481624256
-27-2102022671
+281656273840
 215275326605
-Controls\DeskVizProgressBar.xaml;Views\MainWindow.xaml;Views\SettingsWindow.xaml;Widgets\ClockWidget\ClockWidget.xaml;Widgets\ClockWidget\ClockWidgetSettings.xaml;Widgets\CpuWidget\CpuWidget.xaml;Widgets\CpuWidget\CpuWidgetSettings.xaml;Widgets\GpuWidget\GpuWidget.xaml;Widgets\GpuWidget\GpuWidgetSettings.xaml;Widgets\LogoWidget\LogoWidget.xaml;Widgets\LogoWidget\LogoWidgetSettings.xaml;Widgets\MediaControlWidget\MediaControlWidget.xaml;Widgets\MediaControlWidget\MediaControlWidgetSettings.xaml;Widgets\RamWidget\RamWidget.xaml;Widgets\RamWidget\RamWidgetSettings.xaml;
+Controls\DeskVizProgressBar.xaml;Views\AboutWindow.xaml;Views\MainWindow.xaml;Views\SettingsWindow.xaml;Widgets\ClockWidget\ClockWidget.xaml;Widgets\ClockWidget\ClockWidgetSettings.xaml;Widgets\CpuWidget\CpuWidget.xaml;Widgets\CpuWidget\CpuWidgetSettings.xaml;Widgets\GpuWidget\GpuWidget.xaml;Widgets\GpuWidget\GpuWidgetSettings.xaml;Widgets\LogoWidget\LogoWidget.xaml;Widgets\LogoWidget\LogoWidgetSettings.xaml;Widgets\MediaControlWidget\MediaControlWidget.xaml;Widgets\MediaControlWidget\MediaControlWidgetSettings.xaml;Widgets\RamWidget\RamWidget.xaml;Widgets\RamWidget\RamWidgetSettings.xaml;
 
 False
 

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DeskViz.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+54f09f35cac801c762a499c3db77a2ee016cb9c4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c6af4442ba1e5592f4a8ae1e9b2996fec6a12f6")]
 [assembly: System.Reflection.AssemblyProductAttribute("DeskViz.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DeskViz.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

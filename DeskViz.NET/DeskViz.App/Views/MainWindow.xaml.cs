@@ -23,6 +23,7 @@ namespace DeskViz.App.Views
         private readonly SettingsService _settingsService;
         private readonly IHardwareMonitorService _hardwareMonitorService; // Added for DI
         private readonly IMediaControlService _mediaControlService; // Added for media control
+        private readonly ISystemTrayService _systemTrayService;
         private List<IWidget> _allWidgets = new List<IWidget>();
 
         public MainWindow()
@@ -34,6 +35,7 @@ namespace DeskViz.App.Views
             _screenService = new ScreenService();
             _hardwareMonitorService = new LibreHardwareMonitorService(); // Create single instance
             _mediaControlService = new WindowsMediaControlService(); // Create media control service
+            _systemTrayService = new SystemTrayService();
 
             try
             {
@@ -58,6 +60,12 @@ namespace DeskViz.App.Views
             RegisterWidgets();
             
             Loaded += Window_Loaded;
+            
+            // Initialize system tray
+            InitializeSystemTray();
+            
+            // Start with window not in taskbar
+            ShowInTaskbar = false;
 
             Debug.WriteLine("MainWindow constructor finished (services initialized).");
         }
@@ -155,6 +163,8 @@ namespace DeskViz.App.Views
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("Window_Loaded started.");
+            
+            // Apply display settings and show the window normally
             ScreenInfo? targetScreen = ApplyDisplaySettings();
             if (targetScreen != null)
             {
@@ -165,6 +175,7 @@ namespace DeskViz.App.Views
             {
                 ApplyFullscreen();
             }
+            
             Debug.WriteLine("Window_Loaded finished.");
         }
 
@@ -408,6 +419,163 @@ namespace DeskViz.App.Views
                 // Show() allows interaction with MainWindow, ShowDialog() blocks it.
                 settingsWindow.Show();
             }
+        }
+
+        private void InitializeSystemTray()
+        {
+            try
+            {
+                // Load the icon from the file system directly
+                var iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "AppIcon.ico");
+                
+                System.Drawing.Icon? icon = null;
+                
+                // Try loading from file first
+                if (System.IO.File.Exists(iconPath))
+                {
+                    icon = new System.Drawing.Icon(iconPath);
+                    Debug.WriteLine($"Loaded icon from file: {iconPath}");
+                }
+                else
+                {
+                    // Fallback to embedded resource
+                    var iconUri = new Uri("pack://application:,,,/Resources/AppIcon.ico");
+                    var iconStream = System.Windows.Application.GetResourceStream(iconUri);
+                    if (iconStream != null)
+                    {
+                        icon = new System.Drawing.Icon(iconStream.Stream);
+                        Debug.WriteLine("Loaded icon from embedded resource");
+                    }
+                }
+                
+                if (icon != null)
+                {
+                    _systemTrayService.Initialize(icon, "DeskViz - System Monitor");
+                    
+                    // Subscribe to events
+                    _systemTrayService.SettingsRequested += SystemTray_SettingsRequested;
+                    _systemTrayService.AboutRequested += SystemTray_AboutRequested;
+                    _systemTrayService.ExitRequested += SystemTray_ExitRequested;
+                    _systemTrayService.TrayIconDoubleClicked += SystemTray_DoubleClicked;
+                    
+                    // Show the tray icon
+                    _systemTrayService.Show();
+                    Debug.WriteLine("System tray initialized successfully");
+                }
+                else
+                {
+                    Debug.WriteLine("Failed to load system tray icon from any source");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error initializing system tray: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        private void SystemTray_SettingsRequested(object? sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                // Restore window
+                RestoreWindow();
+                
+                // Open settings
+                OpenSettingsWindow();
+            });
+        }
+
+        private void SystemTray_AboutRequested(object? sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                ShowAboutDialog();
+            });
+        }
+
+        private void SystemTray_ExitRequested(object? sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                System.Windows.Application.Current.Shutdown();
+            });
+        }
+
+        private void SystemTray_DoubleClicked(object? sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (Visibility != Visibility.Visible)
+                {
+                    // Show window
+                    Show();
+                    Activate();
+                    Focus();
+                }
+                else
+                {
+                    // Hide window
+                    Hide();
+                    _systemTrayService?.ShowBalloonTip("DeskViz", "Application hidden to system tray", 2000);
+                }
+            });
+        }
+        
+        private void RestoreWindow()
+        {
+            // Show window
+            Visibility = Visibility.Visible;
+            Show();
+            WindowState = WindowState.Normal;
+            
+            // Apply fullscreen settings
+            ScreenInfo? targetScreen = ApplyDisplaySettings();
+            if (targetScreen != null)
+            {
+                MoveToScreen(targetScreen);
+                ApplyFullscreen(targetScreen);
+            }
+            else
+            {
+                ApplyFullscreen();
+            }
+            
+            // Bring to front
+            Activate();
+            Focus();
+        }
+
+        private void ShowAboutDialog()
+        {
+            var aboutWindow = new AboutWindow
+            {
+                Owner = this
+            };
+            aboutWindow.ShowDialog();
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            
+            // If minimized, hide the window instead
+            if (WindowState == WindowState.Minimized)
+            {
+                // Prevent actual minimize, hide instead
+                WindowState = WindowState.Normal;
+                Hide();
+                
+                // Show notification
+                _systemTrayService?.ShowBalloonTip("DeskViz", "Application hidden to system tray", 2000);
+            }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            // Clean up system tray on close
+            _systemTrayService?.Dispose();
+            base.OnClosed(e);
         }
     }
 }
