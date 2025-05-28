@@ -1,0 +1,60 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "build app",
+        "command": "dotnet",
+        "type": "shell",
+        "args": [
+          "build",
+          "${workspaceFolder}/DeskViz.App/DeskViz.App.csproj",
+          "/property:GenerateFullPaths=true",
+          "/consoleloggerparameters:NoSummary"
+        ],
+        "problemMatcher": "$msCompile",
+        "presentation": {
+          "reveal": "silent"
+        }
+      },
+      {
+        "label": "build core",
+        "command": "dotnet",
+        "type": "shell",
+        "args": [
+          "build",
+          "${workspaceFolder}/DeskViz.Core/DeskViz.Core.csproj",
+          "/property:GenerateFullPaths=true",
+          "/consoleloggerparameters:NoSummary"
+        ],
+        "problemMatcher": "$msCompile",
+        "presentation": {
+          "reveal": "silent"
+        }
+      },
+      {
+        "label": "build all",
+        "dependsOn": ["build core", "build app"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      },
+      {
+        "label": "publish app",
+        "command": "dotnet",
+        "type": "shell",
+        "args": [
+          "publish",
+          "${workspaceFolder}/DeskViz.App/DeskViz.App.csproj",
+          "-c",
+          "Release",
+          "/property:GenerateFullPaths=true",
+          "/consoleloggerparameters:NoSummary"
+        ],
+        "problemMatcher": "$msCompile",
+        "presentation": {
+          "reveal": "always"
+        }
+      }
+    ]
+  }

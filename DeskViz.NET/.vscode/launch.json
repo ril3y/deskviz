@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Core Launch (WPF)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build app", // Ensure it builds before launching
+            "program": "${workspaceFolder}/DeskViz.App/bin/Debug/net8.0-windows/DeskViz.App.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/DeskViz.App", // Set CWD to the app's folder
+            "stopAtEntry": false,
+            "console": "internalConsole", // Show output in Debug Console
+            "logging": { // Enable logging to help diagnose issues
+                "moduleLoad": false
+            }
+        }
+    ]
+}

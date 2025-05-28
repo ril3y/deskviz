@@ -1,0 +1,26 @@
+<Application x:Class="DeskViz.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DeskViz.App"
+             xmlns:converters="clr-namespace:DeskViz.App.Converters"
+             xmlns:controls="clr-namespace:DeskViz.App.Controls"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Add any additional resource dictionaries here -->
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Global styles and resources -->
+            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+            <converters:InvertBooleanConverter x:Key="InvertBooleanConverter"/>
+
+            <!-- Context Menu for Widgets -->
+            <ContextMenu x:Key="WidgetContextMenu">
+                <MenuItem Header="Settings..."/>
+                <!-- Add other common widget actions here if needed -->
+            </ContextMenu>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

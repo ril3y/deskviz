@@ -1,0 +1,33 @@
+<UserControl x:Class="DeskViz.App.Controls.DeskVizProgressBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:DeskViz.App.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="20" d:DesignWidth="200"
+             x:Name="Root">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <local:AnimatedProgressBar Grid.Column="0"
+                                 x:Name="InternalProgressBar"
+                                 Height="{Binding ElementName=Root, Path=BarHeight}"
+                                 Maximum="{Binding ElementName=Root, Path=Maximum}"
+                                 Foreground="{Binding ElementName=Root, Path=ProgressBrush}"
+                                 Background="{Binding ElementName=Root, Path=BackgroundBrush}"
+                                 AnimatedValue="{Binding ElementName=Root, Path=Value}"/>
+
+        <TextBlock Grid.Column="1"
+                   x:Name="PercentageText"
+                   Text="{Binding ElementName=Root, Path=ValueText}"
+                   Foreground="{Binding ElementName=Root, Path=TextBrush}"
+                   FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   Margin="8,0,0,0"
+                   Visibility="{Binding ElementName=Root, Path=ShowText, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+    </Grid>
+</UserControl>

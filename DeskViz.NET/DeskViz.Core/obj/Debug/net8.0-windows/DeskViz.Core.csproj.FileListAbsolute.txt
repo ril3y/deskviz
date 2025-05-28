@@ -1,0 +1,24 @@
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.deps.json
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.dll
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.pdb
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.csproj.AssemblyReference.cache
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.AssemblyInfoInputs.cache
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.AssemblyInfo.cs
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.csproj.CoreCompileInputs.cache
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.dll
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\refint\DeskViz.Core.dll
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.pdb
+D:\Projects\Flutter Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\ref\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.deps.json
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows\DeskViz.Core.pdb
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.csproj.AssemblyReference.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.GeneratedMSBuildEditorConfig.editorconfig
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.AssemblyInfoInputs.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.AssemblyInfo.cs
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.csproj.CoreCompileInputs.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\refint\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\DeskViz.Core.pdb
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows\ref\DeskViz.Core.dll

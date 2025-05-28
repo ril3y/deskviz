@@ -1,0 +1,131 @@
+<UserControl x:Class="DeskViz.App.Widgets.CpuWidget"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:DeskViz.App.Widgets"
+             xmlns:converters="clr-namespace:DeskViz.App.Converters"
+             xmlns:controls="clr-namespace:DeskViz.App.Controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="400">
+    <UserControl.Resources>
+        <converters:TemperatureToStringConverter x:Key="TempConverter"/>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Configure CPU Widget" Command="{Binding ConfigureWidgetCommand}"/>
+            </ContextMenu>
+        </Grid.ContextMenu>
+        
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <TextBlock Text="CPU Usage" 
+                       Foreground="White" 
+                       FontSize="18"
+                       FontWeight="Bold"
+                       VerticalAlignment="Center"/>
+            
+            <Button x:Name="ConfigButton"
+                    Grid.Column="1"
+                    Content="⚙️"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Click="ConfigButton_Click"
+                    Foreground="LightGray"
+                    ToolTip="Configure CPU Widget"
+                    Visibility="{Binding IsConfiguring, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Width="32" Height="32"/>
+        </Grid>
+        
+        <!-- CPU Name -->
+        <TextBlock Grid.Row="1" 
+                   x:Name="CpuNameTextBlock" 
+                   Text="{Binding CpuName}" 
+                   Foreground="LightGray" 
+                   Margin="0,0,0,10"
+                   TextTrimming="CharacterEllipsis"/>
+        
+        <!-- Overall CPU Usage Bar & Temp -->
+        <Grid Grid.Row="2" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" /> <!-- For Temp -->
+            </Grid.ColumnDefinitions>
+
+            <controls:DeskVizProgressBar Grid.Column="0"
+                         Value="{Binding OverallCpuUsagePercentage}"
+                         ProgressBrush="{Binding OverallCpuUsageColor}"
+                         Maximum="100"
+                         BarHeight="10"
+                         ShowText="False"/>
+
+            <TextBlock Grid.Column="1"
+                       x:Name="CpuTempTextBlock"
+                       Text="{Binding CpuTemperature, Converter={StaticResource TempConverter}}"
+                       Foreground="White"
+                       FontWeight="SemiBold"
+                       FontSize="{Binding TemperatureFontSize}"
+                       VerticalAlignment="Center"
+                       Margin="15,0,0,0"
+                       Visibility="{Binding ShowTemperature, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </Grid>
+        
+        <!-- Additional CPU Metrics (Clock Speed, Power Usage) -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,10" Orientation="Horizontal">
+            <TextBlock Text="Clock: " Foreground="LightGray" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding CpuClockSpeed, StringFormat={}{0:0.0} MHz}" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Row="4" Margin="0,0,0,10" Orientation="Horizontal" Visibility="{Binding ShowPowerUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="Power: " Foreground="LightGray" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding CpuPowerUsage, StringFormat={}{0:0.0} W}" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </StackPanel>
+        
+        <!-- Individual Cores -->
+        <ItemsControl Grid.Row="5" 
+                      x:Name="CpuCoresItemsControl"
+                      ItemsSource="{Binding CpuCores}"
+                      Margin="0,8,0,0"
+                      Visibility="{Binding ShowCores, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="60"/> <!-- For Core Name -->
+                            <ColumnDefinition Width="*"/> <!-- For Progress Bar -->
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Name}"
+                                   Foreground="LightGray"
+                                   VerticalAlignment="Center"/>
+                        
+                        <controls:DeskVizProgressBar Grid.Column="1"
+                                     Margin="10,0,0,0"
+                                     Value="{Binding UsagePercentage}"
+                                     ProgressBrush="{Binding UsageColor}"
+                                     Maximum="100"
+                                     BarHeight="8"
+                                     ShowText="False"/>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>
