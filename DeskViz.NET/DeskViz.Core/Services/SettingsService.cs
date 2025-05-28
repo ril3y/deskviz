@@ -255,6 +255,11 @@ namespace DeskViz.Core.Services
         public double CpuTemperatureFontSize { get; set; } = 12;
 
         /// <summary>
+        /// Gets or sets whether to show CPU clock speed.
+        /// </summary>
+        public bool CpuShowClockSpeed { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets whether to show CPU power usage.
         /// </summary>
         public bool CpuShowPowerUsage { get; set; } = true;

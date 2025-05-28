@@ -27,7 +27,8 @@ namespace DeskViz.App.Widgets
             FahrenheitRadioButton.IsChecked = _cpuWidget.UseFahrenheit;
             TempFontSizeSlider.Value = _cpuWidget.TemperatureFontSize;
             
-            // Initialize metrics controls (only power usage now)
+            // Initialize metrics controls
+            ShowClockSpeedCheckBox.IsChecked = _cpuWidget.ShowClockSpeed;
             ShowPowerUsageCheckBox.IsChecked = _cpuWidget.ShowPowerUsage;
         }
 
@@ -45,7 +46,8 @@ namespace DeskViz.App.Widgets
             _cpuWidget.UseFahrenheit = FahrenheitRadioButton.IsChecked ?? false;
             _cpuWidget.TemperatureFontSize = TempFontSizeSlider.Value;
             
-            // Apply metrics settings (only power usage now)
+            // Apply metrics settings
+            _cpuWidget.ShowClockSpeed = ShowClockSpeedCheckBox.IsChecked ?? true;
             _cpuWidget.ShowPowerUsage = ShowPowerUsageCheckBox.IsChecked ?? false;
             
             // Close the dialog

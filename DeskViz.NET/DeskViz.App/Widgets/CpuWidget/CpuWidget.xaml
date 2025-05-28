@@ -10,6 +10,7 @@
              d:DesignHeight="300" d:DesignWidth="400">
     <UserControl.Resources>
         <converters:TemperatureToStringConverter x:Key="TempConverter"/>
+        <converters:MHzToGHzConverter x:Key="MHzToGHzConverter"/>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
     <Grid>
@@ -87,9 +88,9 @@
         </Grid>
         
         <!-- Additional CPU Metrics (Clock Speed, Power Usage) -->
-        <StackPanel Grid.Row="3" Margin="0,0,0,10" Orientation="Horizontal">
+        <StackPanel Grid.Row="3" Margin="0,0,0,10" Orientation="Horizontal" Visibility="{Binding ShowClockSpeed, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="Clock: " Foreground="LightGray" VerticalAlignment="Center"/>
-            <TextBlock Text="{Binding CpuClockSpeed, StringFormat={}{0:0.0} MHz}" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding CpuClockSpeed, Converter={StaticResource MHzToGHzConverter}, StringFormat={}{0:F1} GHz}" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </StackPanel>
         
         <StackPanel Grid.Row="4" Margin="0,0,0,10" Orientation="Horizontal" Visibility="{Binding ShowPowerUsage, Converter={StaticResource BooleanToVisibilityConverter}}">

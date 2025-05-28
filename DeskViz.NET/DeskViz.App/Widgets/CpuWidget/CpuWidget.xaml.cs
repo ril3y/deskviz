@@ -274,6 +274,7 @@ namespace DeskViz.App.Widgets
                 {
                     _showClockSpeed = value;
                     OnPropertyChanged();
+                    SaveSettings();
                 }
             }
         }
@@ -371,6 +372,7 @@ namespace DeskViz.App.Widgets
             ShowTemperature = settings.CpuShowTemperature;
             UseFahrenheit = settings.CpuUseFahrenheit;
             TemperatureFontSize = settings.CpuTemperatureFontSize;
+            ShowClockSpeed = settings.CpuShowClockSpeed;
             ShowPowerUsage = settings.CpuShowPowerUsage;
             UpdateIntervalSeconds = settings.CpuUpdateIntervalSeconds;
             
@@ -393,6 +395,7 @@ namespace DeskViz.App.Widgets
             settings.CpuShowTemperature = ShowTemperature;
             settings.CpuUseFahrenheit = UseFahrenheit;
             settings.CpuTemperatureFontSize = TemperatureFontSize;
+            settings.CpuShowClockSpeed = ShowClockSpeed;
             settings.CpuShowPowerUsage = ShowPowerUsage;
             settings.CpuUpdateIntervalSeconds = UpdateIntervalSeconds;
             
