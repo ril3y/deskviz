@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DeskViz.App")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+31fe46c4c2dab06551f5b9563e668ec09fd64ed0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+54f09f35cac801c762a499c3db77a2ee016cb9c4")]
 [assembly: System.Reflection.AssemblyProductAttribute("DeskViz.App")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DeskViz.App")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

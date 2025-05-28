@@ -1,0 +1,13 @@
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.csproj.AssemblyReference.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.GeneratedMSBuildEditorConfig.editorconfig
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.AssemblyInfoInputs.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.AssemblyInfo.cs
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.csproj.CoreCompileInputs.cache
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.sourcelink.json
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.deps.json
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\bin\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.pdb
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\refint\DeskViz.Core.dll
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\DeskViz.Core.pdb
+X:\Projects\DeskViz\deskviz\DeskViz.NET\DeskViz.Core\obj\Debug\net8.0-windows10.0.19041.0\ref\DeskViz.Core.dll

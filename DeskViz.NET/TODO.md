@@ -53,6 +53,13 @@
 - [ ] Add widget visibility toggling
 - [ ] Create custom layout persistence
 - [ ] Add system tray icon with quick actions
+  - [ ] Create notification area (system tray) icon using app icon
+  - [ ] Implement right-click context menu with options:
+    - [ ] "Widget Settings" - opens main settings window
+    - [ ] "About" - shows app version and information
+    - [ ] "Exit" - closes the application
+  - [ ] Add option to minimize to tray instead of taskbar
+  - [ ] Show/hide main window on tray icon double-click
 - [ ] Create a widget marketplace concept
 - [ ] Implement widget settings persistence per plugin
 - [ ] Add a widget development SDK

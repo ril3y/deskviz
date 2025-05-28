@@ -318,5 +318,16 @@ namespace DeskViz.Core.Services
         /// Gets or sets the selected GPU index for the GPU widget.
         /// </summary>
         public int GpuSelectedIndex { get; set; } = 0;
+        
+        // Media Control Widget Settings
+        /// <summary>
+        /// Gets or sets whether to show the media control widget title.
+        /// </summary>
+        public bool MediaControlShowTitle { get; set; } = true;
+        
+        /// <summary>
+        /// Gets or sets whether to show the media control widget subtitle.
+        /// </summary>
+        public bool MediaControlShowSubtitle { get; set; } = true;
     }
 }

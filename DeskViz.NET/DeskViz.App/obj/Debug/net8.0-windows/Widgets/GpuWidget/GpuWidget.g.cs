@@ -55,7 +55,7 @@ namespace DeskViz.App.Widgets.GpuWidget {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/DeskViz.App;component/widgets/gpuwidget/gpuwidget.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/DeskViz.App;V1.0.0.0;component/widgets/gpuwidget/gpuwidget.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\..\Widgets\GpuWidget\GpuWidget.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

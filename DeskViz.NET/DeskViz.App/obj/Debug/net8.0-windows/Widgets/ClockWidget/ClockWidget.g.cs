@@ -60,7 +60,7 @@ namespace DeskViz.App.Widgets {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/DeskViz.App;component/widgets/clockwidget/clockwidget.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/DeskViz.App;V1.0.0.0;component/widgets/clockwidget/clockwidget.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\..\Widgets\ClockWidget\ClockWidget.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using DeskViz.App.Widgets;
 using DeskViz.App.Widgets.GpuWidget;
+using DeskViz.App.Widgets.MediaControlWidget;
 using DeskViz.Core.Services;
 using ScreenInfo = DeskViz.Core.Services.ScreenInfo;
 
@@ -21,6 +22,7 @@ namespace DeskViz.App.Views
         private readonly ScreenService _screenService;
         private readonly SettingsService _settingsService;
         private readonly IHardwareMonitorService _hardwareMonitorService; // Added for DI
+        private readonly IMediaControlService _mediaControlService; // Added for media control
         private List<IWidget> _allWidgets = new List<IWidget>();
 
         public MainWindow()
@@ -31,6 +33,7 @@ namespace DeskViz.App.Views
             _settingsService = new SettingsService();
             _screenService = new ScreenService();
             _hardwareMonitorService = new LibreHardwareMonitorService(); // Create single instance
+            _mediaControlService = new WindowsMediaControlService(); // Create media control service
 
             try
             {
@@ -92,6 +95,12 @@ namespace DeskViz.App.Views
             clockWidget.DataContext = clockWidget;
             clockWidget.ConfigButtonClicked += Widget_ConfigButtonClicked; // Although unused in ClockWidget, keep consistency
             _allWidgets.Add(clockWidget);
+            
+            // Create Media Control widget
+            var mediaControlWidget = new MediaControlWidget(_mediaControlService, _settingsService);
+            mediaControlWidget.DataContext = mediaControlWidget;
+            mediaControlWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
+            _allWidgets.Add(mediaControlWidget);
 
             /*
             // Create YouTube Music widget

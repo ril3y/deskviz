@@ -1,0 +1,270 @@
+<UserControl x:Class="DeskViz.App.Widgets.MediaControlWidget.MediaControlWidget"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:DeskViz.App.Widgets.MediaControlWidget"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="500">
+    
+    <UserControl.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="Configure Widget" Click="ConfigButton_Click" />
+        </ContextMenu>
+    </UserControl.ContextMenu>
+    
+    <Border Background="#1F1F1F" BorderBrush="#2A2A2A" BorderThickness="1" CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#2A2A2A" CornerRadius="10,10,0,0" Padding="15,10" Visibility="{Binding HeaderVisibility}">
+                <StackPanel>
+                    <TextBlock Text="Media Control" FontSize="18" FontWeight="Bold" Foreground="White" Visibility="{Binding TitleVisibility}"/>
+                    <TextBlock Text="{Binding AppName}" FontSize="12" Foreground="#B0B0B0" Margin="0,2,0,0" Visibility="{Binding SubtitleVisibility}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Main Content: Album Art + Controls -->
+            <Grid Grid.Row="1" Margin="15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Large Album Art -->
+                <Border Grid.Column="0" Width="150" Height="150" Background="#333333" CornerRadius="8" Margin="0,0,20,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AlbumArtSource}" Value="{x:Null}">
+                                    <Setter Property="Background" Value="#444444"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Image x:Name="AlbumArtImage" Source="{Binding AlbumArtSource}" Stretch="UniformToFill"/>
+                        <!-- Fallback icon when no album art -->
+                        <TextBlock Text="♪" FontSize="60" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AlbumArtSource}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+                
+                <!-- All Controls on Right -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                
+                    <!-- Track Info -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="White" 
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Artist}" FontSize="14" Foreground="#B0B0B0" 
+                                   TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding Album}" FontSize="12" Foreground="#808080" 
+                                   TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    
+                    <!-- Progress Bar -->
+                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Column="0" Text="{Binding PositionText}" FontSize="10" Foreground="#808080" Margin="0,0,5,0"/>
+                        <Slider Grid.Column="1" x:Name="ProgressSlider" Value="{Binding ProgressPercent}" Maximum="100" Height="20" 
+                                VerticalAlignment="Center" ValueChanged="ProgressSlider_ValueChanged">
+                            <Slider.Style>
+                                <Style TargetType="Slider">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Slider">
+                                                <Grid>
+                                                    <Border Name="TrackBackground" Height="6" Background="#333333" CornerRadius="3"/>
+                                                    <Track Name="PART_Track">
+                                                        <Track.DecreaseRepeatButton>
+                                                            <RepeatButton Command="Slider.DecreaseLarge" Background="#4FC3F7" Height="6"/>
+                                                        </Track.DecreaseRepeatButton>
+                                                        <Track.IncreaseRepeatButton>
+                                                            <RepeatButton Command="Slider.IncreaseLarge" Background="Transparent" Height="6"/>
+                                                        </Track.IncreaseRepeatButton>
+                                                        <Track.Thumb>
+                                                            <Thumb Width="16" Height="16" Background="#4FC3F7" BorderBrush="White" BorderThickness="2">
+                                                                <Thumb.Template>
+                                                                    <ControlTemplate TargetType="Thumb">
+                                                                        <Ellipse Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="{TemplateBinding BorderThickness}"/>
+                                                                    </ControlTemplate>
+                                                                </Thumb.Template>
+                                                            </Thumb>
+                                                        </Track.Thumb>
+                                                    </Track>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Slider.Style>
+                        </Slider>
+                        <TextBlock Grid.Column="2" Text="{Binding DurationText}" FontSize="10" Foreground="#808080" Margin="5,0,0,0"/>
+                    </Grid>
+
+                    <!-- Media Controls -->
+                    <Grid Grid.Row="2" Margin="0,0,0,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Previous Button -->
+                <Button Grid.Column="1" x:Name="PreviousButton" Width="50" Height="50" Margin="5"
+                        Background="#333333" BorderBrush="#555555" BorderThickness="1"
+                        Click="PreviousButton_Click" IsEnabled="{Binding CanSkipPrevious}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" 
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="25">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#555555"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#222222"/>
+                                    <Setter Property="BorderBrush" Value="#333333"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock Text="⏮" FontSize="20" Foreground="White"/>
+                </Button>
+                
+                <!-- Play/Pause Button -->
+                <Button Grid.Column="2" x:Name="PlayPauseButton" Width="60" Height="60" Margin="5"
+                        Background="#4FC3F7" BorderBrush="#4FC3F7" BorderThickness="1"
+                        Click="PlayPauseButton_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" 
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="30">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#3A9BC1"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock Text="{Binding PlayPauseIcon}" FontSize="24" Foreground="White"/>
+                </Button>
+                
+                <!-- Stop Button -->
+                <Button Grid.Column="3" x:Name="StopButton" Width="50" Height="50" Margin="5"
+                        Background="#333333" BorderBrush="#555555" BorderThickness="1"
+                        Click="StopButton_Click" IsEnabled="{Binding CanStop}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" 
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="25">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#555555"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#222222"/>
+                                    <Setter Property="BorderBrush" Value="#333333"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock Text="⏹" FontSize="20" Foreground="White"/>
+                </Button>
+                
+                <!-- Next Button -->
+                <Button Grid.Column="4" x:Name="NextButton" Width="50" Height="50" Margin="5"
+                        Background="#333333" BorderBrush="#555555" BorderThickness="1"
+                        Click="NextButton_Click" IsEnabled="{Binding CanSkipNext}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" 
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="25">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#555555"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#222222"/>
+                                    <Setter Property="BorderBrush" Value="#333333"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock Text="⏭" FontSize="20" Foreground="White"/>
+                </Button>
+                    </Grid>
+
+                    <!-- Volume Control -->
+                    <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="🔊" FontSize="16" Foreground="#B0B0B0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                
+                <!-- Custom touch-friendly volume control -->
+                <Border Grid.Column="1" x:Name="VolumeTrack" Height="30" Background="#333333" CornerRadius="15" 
+                        MouseLeftButtonDown="VolumeTrack_MouseDown" MouseMove="VolumeTrack_MouseMove" MouseLeftButtonUp="VolumeTrack_MouseUp">
+                    <Grid>
+                        <!-- Progress indicator -->
+                        <Border x:Name="VolumeProgress" Background="#4FC3F7" CornerRadius="15" HorizontalAlignment="Left"/>
+                        <!-- Volume percentage text overlay -->
+                        <TextBlock Text="{Binding Volume, StringFormat='{}{0:F0}%'}" FontSize="11" Foreground="White" 
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </Grid>
+                </Border>
+                
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>
