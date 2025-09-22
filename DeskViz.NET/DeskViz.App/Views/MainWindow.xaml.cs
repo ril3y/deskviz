@@ -24,6 +24,7 @@ namespace DeskViz.App.Views
         private readonly IHardwareMonitorService _hardwareMonitorService; // Added for DI
         private readonly IMediaControlService _mediaControlService; // Added for media control
         private readonly ISystemTrayService _systemTrayService;
+        private readonly AutoRotationService _autoRotationService;
         private List<IWidget> _allWidgets = new List<IWidget>();
         
         // TODO: Add swipe tracking variables when implementing gestures
@@ -38,6 +39,7 @@ namespace DeskViz.App.Views
             _hardwareMonitorService = new LibreHardwareMonitorService(); // Create single instance
             _mediaControlService = new WindowsMediaControlService(); // Create media control service
             _systemTrayService = new SystemTrayService();
+            _autoRotationService = new AutoRotationService(_settingsService);
 
             try
             {
@@ -69,10 +71,13 @@ namespace DeskViz.App.Views
             RegisterWidgets();
             
             Loaded += Window_Loaded;
-            
+
             // Initialize system tray
             InitializeSystemTray();
-            
+
+            // Initialize auto-rotation
+            InitializeAutoRotation();
+
             // Start with window not in taskbar
             ShowInTaskbar = false;
 
@@ -352,6 +357,13 @@ namespace DeskViz.App.Views
 
         private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            // Notify auto-rotation of user interaction for navigation keys
+            if (e.Key == System.Windows.Input.Key.Left || e.Key == System.Windows.Input.Key.Right ||
+                e.Key == System.Windows.Input.Key.PageUp || e.Key == System.Windows.Input.Key.PageDown)
+            {
+                OnUserInteraction();
+            }
+
             if (e.Key == System.Windows.Input.Key.Escape)
             {
                 OpenSettingsWindow();
@@ -427,6 +439,12 @@ namespace DeskViz.App.Views
         private void ContextMenuSettings_Click(object sender, RoutedEventArgs e)
         {
             OpenSettingsWindow();
+        }
+
+        private void ContextMenuPageSettings_Click(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine($"ContextMenuPageSettings_Click called - Current page: {PagedContainer.CurrentPageIndex}");
+            OpenSettingsWindow(openPageSettings: true);
         }
 
         private void ContextMenuExit_Click(object sender, RoutedEventArgs e)
@@ -513,8 +531,87 @@ namespace DeskViz.App.Views
             }
         }
 
+        private void InitializeAutoRotation()
+        {
+            // Subscribe to auto-rotation events
+            _autoRotationService.PageRotationRequested += OnAutoRotationRequested;
+            _autoRotationService.AutoRotationStateChanged += OnAutoRotationStateChanged;
+
+            // Start auto-rotation if enabled
+            if (_settingsService.Settings.AutoRotationEnabled)
+            {
+                _autoRotationService.Start();
+            }
+
+            Debug.WriteLine($"Auto-rotation initialized. Enabled: {_settingsService.Settings.AutoRotationEnabled}");
+        }
+
+        private void OnAutoRotationRequested(object? sender, PageRotationEventArgs e)
+        {
+            // Switch to the next page
+            Dispatcher.BeginInvoke(() =>
+            {
+                try
+                {
+                    Debug.WriteLine($"Auto-rotation: switching from page {e.CurrentPageIndex} to {e.NextPageIndex} (mode: {e.RotationMode})");
+
+                    // Update settings service current page
+                    _settingsService.SetCurrentPageIndex(e.NextPageIndex);
+
+                    // Navigate the UI to the new page
+                    PagedContainer.NavigateToPage(e.NextPageIndex);
+
+                    // Update the current page menu item
+                    UpdateCurrentPageMenuItem();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error during auto-rotation: {ex.Message}");
+                }
+            });
+        }
+
+        private void OnAutoRotationStateChanged(object? sender, bool isEnabled)
+        {
+            Debug.WriteLine($"Auto-rotation state changed: {(isEnabled ? "Started" : "Stopped")}");
+        }
+
+        public void OnUserInteraction()
+        {
+            // Notify auto-rotation service of user interaction
+            _autoRotationService?.OnUserInteraction();
+        }
+
+        private void RefreshAutoRotationSettings()
+        {
+            try
+            {
+                // Update the timer settings based on current configuration
+                _autoRotationService?.UpdateTimerSettings();
+
+                // Start or stop auto-rotation based on settings
+                if (_settingsService.Settings.AutoRotationEnabled)
+                {
+                    _autoRotationService?.Start();
+                    Debug.WriteLine("Auto-rotation started after settings update");
+                }
+                else
+                {
+                    _autoRotationService?.Stop();
+                    Debug.WriteLine("Auto-rotation stopped after settings update");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error refreshing auto-rotation settings: {ex.Message}");
+            }
+        }
+
         private void Widget_ConfigButtonClicked(object? sender, EventArgs e)
         {
+            // Notify auto-rotation of user interaction
+            OnUserInteraction();
+
             if (sender is IWidget widget)
             {
                 // Open the widget's specific settings dialog
@@ -525,9 +622,9 @@ namespace DeskViz.App.Views
         /// <summary>
         /// Opens the main application settings window.
         /// </summary>
-        private void OpenSettingsWindow() // Remove optional parameter
+        private void OpenSettingsWindow(bool openPageSettings = false) // Add optional parameter
         {
-            Debug.WriteLine("Opening SettingsWindow..."); // Revert log message
+            Debug.WriteLine($"OpenSettingsWindow called - openPageSettings: {openPageSettings}, CurrentPage: {PagedContainer.CurrentPageIndex}"); // Enhanced log message
             // Check if an instance already exists to prevent duplicates (optional, depends on desired behavior)
             var existingSettingsWindow = System.Windows.Application.Current.Windows.OfType<SettingsWindow>().FirstOrDefault();
             if (existingSettingsWindow != null)
@@ -545,8 +642,28 @@ namespace DeskViz.App.Views
                 Debug.WriteLine("Creating new SettingsWindow instance.");
                 // Pass both required services to the constructor - Revert to 3 arguments
                 var settingsWindow = new SettingsWindow(_screenService, _settingsService, _allWidgets);
+
+                // Subscribe to widget configuration changes for real-time updates
+                settingsWindow.WidgetConfigurationChanged += (s, args) =>
+                {
+                    Debug.WriteLine("Widget configuration changed. Refreshing page display.");
+                    RefreshCurrentPageDisplay();
+                };
+
+                // If opening page settings, navigate to Pages tab and select current page
+                if (openPageSettings)
+                {
+                    settingsWindow.OpenPageSettings(PagedContainer.CurrentPageIndex);
+                }
                 settingsWindow.Owner = this; // Set the owner to the MainWindow
-                settingsWindow.Closed += (s, args) => Debug.WriteLine("SettingsWindow closed.");
+                settingsWindow.Closed += (s, args) =>
+                {
+                    Debug.WriteLine("SettingsWindow closed.");
+                    // Refresh auto-rotation settings when settings window closes
+                    RefreshAutoRotationSettings();
+                    // Also refresh the page display in case there were changes
+                    RefreshCurrentPageDisplay();
+                };
                 // Show as a dialog or non-dialog based on preference.
                 // Show() allows interaction with MainWindow, ShowDialog() blocks it.
                 settingsWindow.Show();
@@ -709,7 +826,31 @@ namespace DeskViz.App.Views
             _systemTrayService?.Dispose();
             base.OnClosed(e);
         }
-        
+
+        /// <summary>
+        /// Refreshes the current page display to reflect any widget configuration changes
+        /// </summary>
+        private void RefreshCurrentPageDisplay()
+        {
+            try
+            {
+                var currentPageIndex = PagedContainer.CurrentPageIndex;
+                Debug.WriteLine($"Refreshing page display for page {currentPageIndex}");
+
+                // Re-initialize the PagedContainer with updated settings
+                PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+
+                // Restore the current page index
+                PagedContainer.CurrentPageIndex = currentPageIndex;
+
+                Debug.WriteLine($"Page display refreshed successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error refreshing page display: {ex.Message}");
+            }
+        }
+
         private void TestPageSelector()
         {
             // Test the page selector by calling the public method we'll add

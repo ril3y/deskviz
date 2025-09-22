@@ -29,7 +29,14 @@
     <Grid>
         <Grid.ContextMenu>
             <ContextMenu>
-                <MenuItem Header="Settings" Click="ContextMenuSettings_Click" />
+                <MenuItem Header="Page Settings" Click="ContextMenuPageSettings_Click" ToolTip="Configure widgets for this page"/>
+                <MenuItem Header="Global Settings" Click="ContextMenuSettings_Click" ToolTip="Display and general settings"/>
+                <Separator />
+                <MenuItem x:Name="CurrentPageMenuItem" Header="Current Page: Main" IsEnabled="False" />
+                <Separator />
+                <MenuItem Header="Pages">
+                    <MenuItem Header="Add New Page" Click="AddNewPage_Click" />
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="Exit" Click="ContextMenuExit_Click" />
             </ContextMenu>
@@ -41,20 +48,9 @@
             
         </Grid.RowDefinitions>
         
-        <!-- Main dashboard content -->
-        <ScrollViewer Grid.Row="1" 
-                     Background="Transparent"
-                     VerticalScrollBarVisibility="Auto"
-                     HorizontalScrollBarVisibility="Disabled">
-            <!-- Use a WrapPanel instead to allow better spacing -->
-            <WrapPanel x:Name="WidgetPanel" 
-                       Orientation="Horizontal"
-                       HorizontalAlignment="Center" 
-                       Margin="15,10"
-                       ItemWidth="NaN"
-                       ItemHeight="NaN">
-                <!-- Widgets will be added here dynamically -->
-            </WrapPanel>
-        </ScrollViewer>
+        <!-- Main dashboard content with paged widgets -->
+        <controls:PagedWidgetContainer x:Name="PagedContainer"
+                                      Grid.Row="1" 
+                                      Background="Transparent"/>
     </Grid>
 </Window>

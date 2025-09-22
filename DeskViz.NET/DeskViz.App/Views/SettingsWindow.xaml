@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:DeskViz.App.Views"
         mc:Ignorable="d"
-        Title="DeskViz Settings" Height="500" Width="500"
+        Title="DeskViz Settings" Height="500" Width="650"
         WindowStartupLocation="CenterOwner" 
         ShowInTaskbar="False" 
         ResizeMode="NoResize">
@@ -19,7 +19,7 @@
         </Grid.RowDefinitions>
 
         <!-- Tabs for different settings sections -->
-        <TabControl Grid.Row="0" Grid.RowSpan="4" Margin="0,0,0,10">
+        <TabControl x:Name="MainTabControl" Grid.Row="0" Grid.RowSpan="4" Margin="0,0,0,10">
             <TabItem Header="Display">
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -35,7 +35,7 @@
                     <!-- Preferred Display -->
                     <Label Grid.Row="0" Grid.Column="0" Content="Preferred Display:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" Name="DisplayComboBox" VerticalAlignment="Center"
-                              DisplayMemberPath="DisplayName"/> 
+                              DisplayMemberPath="DisplayName"/>
                               <!-- Changed from DeviceName to DisplayName -->
 
                     <!-- Widget Orientation -->
@@ -43,48 +43,171 @@
                     <ComboBox Grid.Row="1" Grid.Column="1" Name="OrientationComboBox" VerticalAlignment="Center" Margin="0,10,0,0"/>
                 </Grid>
             </TabItem>
-            
-            <TabItem Header="Widgets">
+
+            <TabItem Header="Pages &amp; Widgets">
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    
-                    <TextBlock Grid.Row="0" Text="Configure Widgets:" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                    
-                    <ListView Grid.Row="1" Name="WidgetsListView" Margin="0,0,0,10">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="Enabled" Width="60">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding IsWidgetVisible}" VerticalAlignment="Center" 
-                                                      Click="WidgetVisibility_Click"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Widget" Width="200">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Actions" Width="120">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <Button Content="↑" Width="24" Margin="2,0" Click="MoveWidgetUp_Click"/>
-                                                <Button Content="↓" Width="24" Margin="2,0" Click="MoveWidgetDown_Click"/>
-                                                <Button Content="⚙️" Width="24" Margin="2,0" Click="WidgetSettings_Click" ToolTip="Widget Settings"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Page List -->
+                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
+                        <TextBlock Text="Pages:" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                        <ListBox Name="PagesListBox" Height="200" SelectionChanged="PagesListBox_SelectionChanged"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Name="AddPageButton" Content="Add Page" Width="60" Margin="0,0,3,0" Click="AddPage_Click"/>
+                            <Button Name="DeletePageButton" Content="Delete" Width="45" Margin="0,0,3,0" Click="DeletePage_Click"/>
+                            <Button Name="MovePageUpButton" Content="↑" Width="25" Margin="0,0,3,0" Click="MovePageUp_Click"/>
+                            <Button Name="MovePageDownButton" Content="↓" Width="25" Click="MovePageDown_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Page Configuration -->
+                    <StackPanel Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" Margin="10,0,0,0">
+                        <TextBlock Text="Page Configuration:" FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                        <!-- Page Name -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="Name:" Width="80" VerticalAlignment="Center"/>
+                            <TextBox Name="PageNameTextBox" Width="200" TextChanged="PageName_Changed"/>
+                            <Button Name="RenamePageButton" Content="Rename" Width="60" Margin="5,0,0,0" Click="RenamePage_Click"/>
+                        </StackPanel>
+
+                        <!-- Widgets for this page -->
+                        <TextBlock Text="Widgets for this page:" FontWeight="SemiBold" Margin="0,20,0,5"/>
+                        <TextBlock Text="Configure each widget specifically for this page. Each page can have different widget settings."
+                                   FontStyle="Italic" FontSize="11" Foreground="Gray" Margin="0,0,0,10"/>
+                        <ListView Name="PageWidgetsListView" Height="300">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Enabled" Width="60">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"
+                                                          Checked="PageWidgetVisibility_Changed" Unchecked="PageWidgetVisibility_Changed"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Widget" Width="100">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding WidgetName}" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Page Settings" Width="80">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding SettingsSummary}" FontStyle="Italic"
+                                                          FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Actions" Width="160">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="Configure" Width="60" Height="20" Margin="1"
+                                                            Click="ConfigurePageWidget_Click" ToolTip="Configure this widget for this page"/>
+                                                    <Button Content="↑" Width="20" Height="20" Margin="1" Click="MovePageWidgetUp_Click"/>
+                                                    <Button Content="↓" Width="20" Height="20" Margin="1" Click="MovePageWidgetDown_Click"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Auto-Rotation">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Enable Auto-Rotation -->
+                    <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                              Name="AutoRotationEnabledCheckBox"
+                              Content="Enable automatic page rotation"
+                              VerticalAlignment="Center"
+                              Margin="0,0,0,15"
+                              Checked="AutoRotationEnabled_Changed"
+                              Unchecked="AutoRotationEnabled_Changed"/>
+
+                    <!-- Rotation Interval -->
+                    <Label Grid.Row="1" Grid.Column="0"
+                           Content="Rotation interval (seconds):"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,10"/>
+                    <TextBox Grid.Row="1" Grid.Column="1"
+                             Name="RotationIntervalTextBox"
+                             Width="100"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"
+                             Margin="0,0,0,10"
+                             TextChanged="RotationInterval_Changed"/>
+
+                    <!-- Rotation Mode -->
+                    <Label Grid.Row="2" Grid.Column="0"
+                           Content="Rotation mode:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,10"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1"
+                              Name="RotationModeComboBox"
+                              Width="150"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              Margin="0,0,0,10"
+                              SelectionChanged="RotationMode_Changed">
+                        <ComboBoxItem Content="Forward" Tag="Forward"/>
+                        <ComboBoxItem Content="Reverse" Tag="Reverse"/>
+                        <ComboBoxItem Content="Ping-Pong" Tag="PingPong"/>
+                    </ComboBox>
+
+                    <!-- Pause on User Interaction -->
+                    <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                              Name="PauseOnInteractionCheckBox"
+                              Content="Pause rotation when user interacts with widgets"
+                              VerticalAlignment="Center"
+                              Margin="0,0,0,15"
+                              Checked="PauseOnInteraction_Changed"
+                              Unchecked="PauseOnInteraction_Changed"/>
+
+                    <!-- Info Text -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0"
+                               Foreground="Gray"
+                               FontSize="11">
+                        <Run Text="Auto-rotation will automatically cycle through your configured pages at the specified interval."/>
+                        <LineBreak/>
+                        <Run Text="• Forward: Cycles through pages in order (1→2→3→1)"/>
+                        <LineBreak/>
+                        <Run Text="• Reverse: Cycles backwards through pages (3→2→1→3)"/>
+                        <LineBreak/>
+                        <Run Text="• Ping-Pong: Bounces back and forth (1→2→3→2→1)"/>
+                        <LineBreak/>
+                        <LineBreak/>
+                        <Run Text="Note: Auto-rotation requires at least 2 pages to function."/>
+                    </TextBlock>
                 </Grid>
             </TabItem>
         </TabControl>

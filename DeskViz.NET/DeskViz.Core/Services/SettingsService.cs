@@ -278,6 +278,108 @@ namespace DeskViz.Core.Services
                 SaveSettings();
             }
         }
+
+        /// <summary>
+        /// Moves a page up in the order (towards index 0)
+        /// </summary>
+        public void MovePageUp(int pageIndex)
+        {
+            if (pageIndex > 0 && pageIndex < _settings.Pages.Count)
+            {
+                var page = _settings.Pages[pageIndex];
+                _settings.Pages.RemoveAt(pageIndex);
+                _settings.Pages.Insert(pageIndex - 1, page);
+
+                // Update current page index if it's affected
+                if (_settings.CurrentPageIndex == pageIndex)
+                {
+                    _settings.CurrentPageIndex = pageIndex - 1;
+                }
+                else if (_settings.CurrentPageIndex == pageIndex - 1)
+                {
+                    _settings.CurrentPageIndex = pageIndex;
+                }
+
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Moves a page down in the order (towards higher indices)
+        /// </summary>
+        public void MovePageDown(int pageIndex)
+        {
+            if (pageIndex >= 0 && pageIndex < _settings.Pages.Count - 1)
+            {
+                var page = _settings.Pages[pageIndex];
+                _settings.Pages.RemoveAt(pageIndex);
+                _settings.Pages.Insert(pageIndex + 1, page);
+
+                // Update current page index if it's affected
+                if (_settings.CurrentPageIndex == pageIndex)
+                {
+                    _settings.CurrentPageIndex = pageIndex + 1;
+                }
+                else if (_settings.CurrentPageIndex == pageIndex + 1)
+                {
+                    _settings.CurrentPageIndex = pageIndex;
+                }
+
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Updates auto-rotation settings
+        /// </summary>
+        public void UpdateAutoRotationSettings(bool enabled, int intervalSeconds, AutoRotationMode mode, bool pauseOnInteraction)
+        {
+            _settings.AutoRotationEnabled = enabled;
+            _settings.AutoRotationIntervalSeconds = intervalSeconds;
+            _settings.RotationMode = mode;
+            _settings.PauseOnUserInteraction = pauseOnInteraction;
+            SaveSettings();
+        }
+
+        /// <summary>
+        /// Gets the next page index based on rotation mode
+        /// </summary>
+        public int GetNextPageIndex(AutoRotationMode mode, int currentIndex, ref bool pingPongDirection)
+        {
+            if (_settings.Pages.Count <= 1) return currentIndex;
+
+            switch (mode)
+            {
+                case AutoRotationMode.Forward:
+                    return (currentIndex + 1) % _settings.Pages.Count;
+
+                case AutoRotationMode.Reverse:
+                    return currentIndex == 0 ? _settings.Pages.Count - 1 : currentIndex - 1;
+
+                case AutoRotationMode.PingPong:
+                    if (pingPongDirection) // Going forward
+                    {
+                        if (currentIndex == _settings.Pages.Count - 1)
+                        {
+                            pingPongDirection = false;
+                            return Math.Max(0, currentIndex - 1);
+                        }
+                        return currentIndex + 1;
+                    }
+                    else // Going backward
+                    {
+                        if (currentIndex == 0)
+                        {
+                            pingPongDirection = true;
+                            return Math.Min(_settings.Pages.Count - 1, currentIndex + 1);
+                        }
+                        return currentIndex - 1;
+                    }
+
+                default:
+                    return (currentIndex + 1) % _settings.Pages.Count;
+            }
+        }
     }
     
     /// <summary>
@@ -288,6 +390,16 @@ namespace DeskViz.Core.Services
         Auto,       // Determine based on screen orientation
         Horizontal, // Always horizontal
         Vertical    // Always vertical
+    }
+
+    /// <summary>
+    /// Defines auto-rotation modes for page cycling
+    /// </summary>
+    public enum AutoRotationMode
+    {
+        Forward,    // Cycle forward through pages (1→2→3→1)
+        Reverse,    // Cycle backward through pages (3→2→1→3)
+        PingPong    // Ping-pong mode (1→2→3→2→1→2→3)
     }
 
     /// <summary>
@@ -456,5 +568,26 @@ namespace DeskViz.Core.Services
         /// Gets or sets whether to show the media control widget subtitle.
         /// </summary>
         public bool MediaControlShowSubtitle { get; set; } = true;
+
+        // Auto-Rotation Settings
+        /// <summary>
+        /// Gets or sets whether auto-rotation through pages is enabled.
+        /// </summary>
+        public bool AutoRotationEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the interval in seconds between page rotations.
+        /// </summary>
+        public int AutoRotationIntervalSeconds { get; set; } = 10;
+
+        /// <summary>
+        /// Gets or sets the auto-rotation mode (Forward, Reverse, PingPong).
+        /// </summary>
+        public AutoRotationMode RotationMode { get; set; } = AutoRotationMode.Forward;
+
+        /// <summary>
+        /// Gets or sets whether to pause auto-rotation when user interacts with the interface.
+        /// </summary>
+        public bool PauseOnUserInteraction { get; set; } = true;
     }
 }
