@@ -1,0 +1,114 @@
+<Window x:Class="DeskViz.App.Widgets.HardDriveWidgetSettings"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Hard Drive Widget Settings"
+        Height="450" Width="500"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#FF2D2D30">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="Hard Drive Widget Settings"
+                   FontSize="16"
+                   FontWeight="Bold"
+                   Foreground="White"
+                   Margin="0,0,0,20"/>
+
+        <!-- Settings -->
+        <StackPanel Grid.Row="1" Orientation="Vertical">
+
+            <!-- Show Temperature -->
+            <CheckBox x:Name="ShowTemperatureCheckBox"
+                      Content="Show drive temperatures"
+                      Foreground="White"
+                      Margin="0,10"
+                      IsChecked="{Binding ShowTemperature}"/>
+
+            <!-- Show Labels -->
+            <CheckBox x:Name="ShowLabelCheckBox"
+                      Content="Show drive labels"
+                      Foreground="White"
+                      Margin="0,10"
+                      IsChecked="{Binding ShowLabel}"/>
+
+            <!-- Update Interval -->
+            <StackPanel Orientation="Horizontal" Margin="0,10">
+                <TextBlock Text="Update interval (seconds):"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Width="150"/>
+                <TextBox x:Name="UpdateIntervalTextBox"
+                         Text="{Binding UpdateIntervalSeconds}"
+                         Width="100"
+                         Background="#FF3E3E42"
+                         Foreground="White"
+                         BorderBrush="#FF007ACC"
+                         Padding="5,2"/>
+            </StackPanel>
+
+            <!-- Drive Selection -->
+            <TextBlock Text="Select Drives to Display:"
+                       Foreground="White"
+                       FontWeight="Bold"
+                       Margin="0,20,0,10"/>
+
+            <TextBlock Text="(Leave all unchecked to show all drives)"
+                       Foreground="#FFAAAAAA"
+                       FontSize="11"
+                       Margin="0,0,0,10"/>
+
+            <!-- Drive Selection List -->
+            <ScrollViewer Height="120"
+                          Background="#FF3E3E42"
+                          BorderBrush="#FF007ACC"
+                          BorderThickness="1">
+                <ItemsControl x:Name="DriveSelectionList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Margin="10,5"
+                                      Foreground="White"
+                                      IsChecked="{Binding IsSelected}"
+                                      Content="{Binding DisplayText}"
+                                      Checked="DriveSelection_Changed"
+                                      Unchecked="DriveSelection_Changed"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,20,0,0">
+            <Button Content="OK"
+                    Width="75"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    Click="OK_Click"
+                    Background="#FF007ACC"
+                    Foreground="White"
+                    BorderThickness="0"/>
+            <Button Content="Cancel"
+                    Width="75"
+                    Height="30"
+                    Click="Cancel_Click"
+                    Background="#FF3E3E42"
+                    Foreground="White"
+                    BorderThickness="0"/>
+        </StackPanel>
+    </Grid>
+</Window>

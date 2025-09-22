@@ -25,6 +25,8 @@ namespace DeskViz.App.Views
         private readonly IMediaControlService _mediaControlService; // Added for media control
         private readonly ISystemTrayService _systemTrayService;
         private List<IWidget> _allWidgets = new List<IWidget>();
+        
+        // TODO: Add swipe tracking variables when implementing gestures
 
         public MainWindow()
         {
@@ -42,6 +44,13 @@ namespace DeskViz.App.Views
                 Debug.WriteLine("Calling InitializeComponent()...");
                 InitializeComponent();
                 Debug.WriteLine("InitializeComponent() finished.");
+
+                // Enable touch support for the main window
+                Stylus.SetIsTouchFeedbackEnabled(this, false);
+                Stylus.SetIsPressAndHoldEnabled(this, false);
+                Stylus.SetIsFlicksEnabled(this, false);
+                Stylus.SetIsTapFeedbackEnabled(this, false);
+                Debug.WriteLine("Touch support configured for MainWindow");
             }
             catch (Exception ex)
             {
@@ -97,7 +106,13 @@ namespace DeskViz.App.Views
             gpuWidget.DataContext = gpuWidget; // Set DataContext
             gpuWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
             _allWidgets.Add(gpuWidget);
-            
+
+            // Create Hard Drive widget
+            var hardDriveWidget = new HardDriveWidget(_hardwareMonitorService, _settingsService);
+            hardDriveWidget.DataContext = hardDriveWidget; // Set DataContext
+            hardDriveWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
+            _allWidgets.Add(hardDriveWidget);
+
             // Create Clock widget
             var clockWidget = new ClockWidget(_settingsService); // Pass SettingsService
             clockWidget.DataContext = clockWidget;
@@ -118,46 +133,46 @@ namespace DeskViz.App.Views
             _allWidgets.Add(musicWidget);
             */
 
-            // Apply widget visibility based on saved settings
-            foreach (var widget in _allWidgets) 
+            // Debug: Log widget registration
+            System.Diagnostics.Debug.WriteLine($"Registered {_allWidgets.Count} widgets:");
+            foreach (var widget in _allWidgets)
             {
-                bool isVisible = true;
-
-                if (_settingsService.Settings.WidgetVisibility.TryGetValue(widget.WidgetId, out bool savedVisibility))
+                System.Diagnostics.Debug.WriteLine($"  - {widget.WidgetId}: {widget.GetType().Name}");
+            }
+            
+            // Debug: Log page configuration
+            System.Diagnostics.Debug.WriteLine($"Settings has {_settingsService.Settings.Pages.Count} pages:");
+            for (int i = 0; i < _settingsService.Settings.Pages.Count; i++)
+            {
+                var page = _settingsService.Settings.Pages[i];
+                System.Diagnostics.Debug.WriteLine($"  Page {i}: {page.Name} with {page.WidgetIds.Count} widgets");
+                foreach (var widgetId in page.WidgetIds)
                 {
-                    isVisible = savedVisibility;
-                }
-                widget.IsWidgetVisible = isVisible;
-                
-                // Add visible widgets to the UI panel
-                if (isVisible && widget is UIElement uiElement)
-                {
-                    if (uiElement is FrameworkElement frameworkElement)
-                    {
-                        frameworkElement.Margin = new Thickness(10, 5, 10, 10); 
-                    }
-                    WidgetPanel.Children.Add(uiElement);
+                    var isVisible = page.WidgetVisibility.GetValueOrDefault(widgetId, true);
+                    System.Diagnostics.Debug.WriteLine($"    - {widgetId}: {(isVisible ? "visible" : "hidden")}");
                 }
             }
             
-            // Apply widget order based on saved settings
-            // Reorder based on the saved widget order in settings
-            var widgetsInOrder = _settingsService.Settings.WidgetOrder
-                .Where(widgetId => _settingsService.Settings.WidgetVisibility.GetValueOrDefault(widgetId, true)) 
-                .Select(widgetId => WidgetPanel.Children.OfType<FrameworkElement>().FirstOrDefault(w => w is IWidget && ((IWidget)w).WidgetId == widgetId))
-                .Where(widget => widget != null)
-                .ToList();
+            // Ensure all registered widgets are added to at least one page
+            EnsureAllWidgetsInPages();
 
-            // Reorder widgets
-            foreach (var widget in widgetsInOrder)
+            // Initialize the PagedWidgetContainer with pages and widgets
+            PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+
+            // Set the current page (ensure it's within bounds)
+            var targetPageIndex = Math.Max(0, Math.Min(_settingsService.Settings.CurrentPageIndex, _settingsService.Settings.Pages.Count - 1));
+            System.Diagnostics.Debug.WriteLine($"Setting current page to: {targetPageIndex} (saved was: {_settingsService.Settings.CurrentPageIndex})");
+            PagedContainer.CurrentPageIndex = targetPageIndex;
+            
+            // Handle page changes
+            PagedContainer.PageChanged += (s, pageIndex) => 
             {
-                int currentIndex = WidgetPanel.Children.IndexOf(widget);
-                if (currentIndex >= 0)
-                {
-                    WidgetPanel.Children.RemoveAt(currentIndex);
-                    WidgetPanel.Children.Add(widget);
-                }
-            }
+                _settingsService.SetCurrentPageIndex(pageIndex);
+                UpdateCurrentPageMenuItem();
+            };
+            
+            // Update the current page display
+            UpdateCurrentPageMenuItem();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -255,7 +270,7 @@ namespace DeskViz.App.Views
                         : System.Windows.Controls.Orientation.Horizontal;
                 }
                 
-                WidgetPanel.Orientation = panelOrientation;
+                // TODO: Apply orientation to PagedWidgetContainer when implemented
             }
             else
             {
@@ -289,40 +304,8 @@ namespace DeskViz.App.Views
         /// </summary>
         public void ApplyWidgetVisibilitySettings()
         {
-            // Apply to all widgets
-            foreach (var widget in _allWidgets)
-            {
-                // Default to visible if no setting exists
-                bool isVisible = true; 
-                
-                // Set visibility on the widget based on saved setting
-                if (_settingsService.Settings.WidgetVisibility.TryGetValue(widget.WidgetId, out bool savedVisibility))
-                {
-                    isVisible = savedVisibility;
-                }
-                widget.IsWidgetVisible = isVisible;
-                
-                // If the widget is a UIElement, update its presence in the panel
-                if (widget is UIElement uiElement)
-                {
-                    if (isVisible)
-                    {
-                        // Only add if not already in the panel
-                        if (!WidgetPanel.Children.Contains(uiElement))
-                        {
-                            WidgetPanel.Children.Add(uiElement);
-                        }
-                    }
-                    else
-                    {
-                        // Remove from panel if hidden
-                        if (WidgetPanel.Children.Contains(uiElement))
-                        {
-                            WidgetPanel.Children.Remove(uiElement);
-                        }
-                    }
-                }
-            }
+            // Re-initialize the PagedWidgetContainer with updated settings
+            PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
             
             // After adjusting visibility, re-apply the correct order
             if (_settingsService != null && _allWidgets != null)
@@ -341,24 +324,29 @@ namespace DeskViz.App.Views
         /// <param name="widgets">List of widgets in the desired order</param>
         public void ReorderWidgets(IEnumerable<IWidget> widgets)
         {
-            if (widgets == null)
+            // With the new paged system, we need to update the current page's widget order
+            if (widgets == null || _settingsService == null)
                 return;
 
-            // Get the container panel
-            if (WidgetPanel != null)
+            var currentPageIndex = PagedContainer.CurrentPageIndex;
+            var currentPage = _settingsService.GetPage(currentPageIndex);
+            
+            if (currentPage != null)
             {
-                // Remove all widgets from the UI
-                WidgetPanel.Children.Clear();
-
-                // Re-add only visible widgets in the specified order
-                foreach (var widget in widgets.Where(w => w.IsWidgetVisible))
+                // Update the widget order for the current page
+                currentPage.WidgetIds.Clear();
+                foreach (var widget in widgets)
                 {
-                    // Only add if it's a UIElement
-                    if (widget is UIElement uiElement)
-                    {
-                        WidgetPanel.Children.Add(uiElement);
-                    }
+                    currentPage.WidgetIds.Add(widget.WidgetId);
+                    currentPage.WidgetVisibility[widget.WidgetId] = widget.IsWidgetVisible;
                 }
+                
+                // Save the updated page configuration
+                _settingsService.UpdatePage(currentPageIndex, currentPage);
+                
+                // Refresh the PagedWidgetContainer
+                PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+                PagedContainer.CurrentPageIndex = currentPageIndex;
             }
         }
 
@@ -367,6 +355,72 @@ namespace DeskViz.App.Views
             if (e.Key == System.Windows.Input.Key.Escape)
             {
                 OpenSettingsWindow();
+            }
+            else if (e.Key == System.Windows.Input.Key.Left)
+            {
+                // Navigate to previous page
+                if (PagedContainer.CurrentPageIndex > 0)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex - 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.Right)
+            {
+                // Navigate to next page
+                var pageCount = _settingsService.Settings.Pages.Count;
+                if (PagedContainer.CurrentPageIndex < pageCount - 1)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex + 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.PageUp)
+            {
+                // Navigate to previous page
+                if (PagedContainer.CurrentPageIndex > 0)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex - 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.PageDown)
+            {
+                // Navigate to next page
+                var pageCount = _settingsService.Settings.Pages.Count;
+                if (PagedContainer.CurrentPageIndex < pageCount - 1)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex + 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.F1)
+            {
+                // Debug: Force reload current page
+                System.Diagnostics.Debug.WriteLine("F1 pressed - forcing page reload");
+                PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+                PagedContainer.CurrentPageIndex = PagedContainer.CurrentPageIndex;
+            }
+            else if (e.Key == System.Windows.Input.Key.F2)
+            {
+                // Debug: Simulate 2-finger swipe left (next page)
+                System.Diagnostics.Debug.WriteLine("F2 pressed - simulating 2-finger swipe left");
+                if (PagedContainer.CurrentPageIndex < _settingsService.Settings.Pages.Count - 1)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex + 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.F3)
+            {
+                // Debug: Simulate 2-finger swipe right (previous page)
+                System.Diagnostics.Debug.WriteLine("F3 pressed - simulating 2-finger swipe right");
+                if (PagedContainer.CurrentPageIndex > 0)
+                {
+                    PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex - 1);
+                }
+            }
+            else if (e.Key == System.Windows.Input.Key.F4)
+            {
+                // Debug: Test swipe-down page selector
+                System.Diagnostics.Debug.WriteLine("F4 pressed - testing page selector overlay");
+                // Add a method to access the page selector from MainWindow
+                TestPageSelector();
             }
         }
 
@@ -379,6 +433,84 @@ namespace DeskViz.App.Views
         {
             // Explicitly qualify Application to resolve ambiguity
             System.Windows.Application.Current.Shutdown();
+        }
+        
+        private void AddNewPage_Click(object sender, RoutedEventArgs e)
+        {
+            // Create input dialog to get page name
+            var dialog = new InputDialog(
+                "Enter a name for the new page:", 
+                "New Page", 
+                $"Page {_settingsService.Settings.Pages.Count + 1}");
+            
+            dialog.Owner = this;
+            
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputValue))
+            {
+                // Add the new page
+                _settingsService.AddPage(dialog.InputValue);
+                
+                // Navigate to the new page
+                var newPageIndex = _settingsService.Settings.Pages.Count - 1;
+                PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+                PagedContainer.NavigateToPage(newPageIndex);
+            }
+        }
+        
+        /// <summary>
+        /// Ensures all registered widgets are present in at least one page
+        /// </summary>
+        private void EnsureAllWidgetsInPages()
+        {
+            if (_allWidgets == null || _settingsService == null)
+                return;
+
+            // Get all widget IDs that are in pages
+            var widgetsInPages = new HashSet<string>();
+            foreach (var page in _settingsService.Settings.Pages)
+            {
+                foreach (var widgetId in page.WidgetIds)
+                {
+                    widgetsInPages.Add(widgetId);
+                }
+            }
+
+            // Find missing widgets
+            var missingWidgets = _allWidgets
+                .Where(w => !widgetsInPages.Contains(w.WidgetId))
+                .ToList();
+
+            if (missingWidgets.Any())
+            {
+                System.Diagnostics.Debug.WriteLine($"Found {missingWidgets.Count} missing widgets, adding to first page:");
+
+                // Add missing widgets to the first page
+                var firstPage = _settingsService.Settings.Pages.FirstOrDefault();
+                if (firstPage != null)
+                {
+                    foreach (var widget in missingWidgets)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Adding {widget.WidgetId} to page '{firstPage.Name}'");
+                        firstPage.WidgetIds.Add(widget.WidgetId);
+                        firstPage.WidgetVisibility[widget.WidgetId] = true; // Default to visible
+                    }
+
+                    // Save the updated page
+                    _settingsService.UpdatePage(0, firstPage);
+                }
+            }
+        }
+
+        private void UpdateCurrentPageMenuItem()
+        {
+            if (CurrentPageMenuItem != null && _settingsService != null)
+            {
+                var currentPage = _settingsService.GetPage(PagedContainer.CurrentPageIndex);
+                if (currentPage != null)
+                {
+                    CurrentPageMenuItem.Header = $"Current Page: {currentPage.Name} ({PagedContainer.CurrentPageIndex + 1}/{_settingsService.Settings.Pages.Count})";
+                }
+            }
         }
 
         private void Widget_ConfigButtonClicked(object? sender, EventArgs e)
@@ -577,5 +709,13 @@ namespace DeskViz.App.Views
             _systemTrayService?.Dispose();
             base.OnClosed(e);
         }
+        
+        private void TestPageSelector()
+        {
+            // Test the page selector by calling the public method we'll add
+            PagedContainer.TestShowPageSelector();
+        }
+        
+        // TODO: Add swipe gestures later after basic functionality works
     }
 }

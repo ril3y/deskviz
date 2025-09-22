@@ -1,0 +1,294 @@
+<UserControl x:Class="DeskViz.App.Controls.PagedWidgetContainer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:DeskViz.App.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="Transparent">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Page Content Area -->
+        <Grid Grid.Row="0"
+              x:Name="PageContainer"
+              Background="Transparent"
+              ClipToBounds="True"
+              IsManipulationEnabled="True"
+              TouchDown="PageContainer_TouchDown"
+              TouchMove="PageContainer_TouchMove"
+              TouchUp="PageContainer_TouchUp"
+              StylusDown="PageContainer_StylusDown"
+              StylusMove="PageContainer_StylusMove"
+              StylusUp="PageContainer_StylusUp"
+              MouseMove="PageContainer_MouseMove"
+              MouseLeftButtonDown="PageContainer_MouseLeftButtonDown"
+              MouseLeftButtonUp="PageContainer_MouseLeftButtonUp"
+              ManipulationStarting="PageContainer_ManipulationStarting"
+              ManipulationDelta="PageContainer_ManipulationDelta"
+              ManipulationCompleted="PageContainer_ManipulationCompleted"
+              ManipulationInertiaStarting="PageContainer_ManipulationInertiaStarting">
+            
+            <!-- Transform for swiping animation -->
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="PageTransform"/>
+            </Grid.RenderTransform>
+            
+            <!-- Current Page Content -->
+            <ScrollViewer x:Name="CurrentPageScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="CurrentPageWidgets"
+                              Background="Transparent">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Vertical" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </ScrollViewer>
+            
+            <!-- Next/Previous Page for Animation -->
+            <ScrollViewer x:Name="NextPageScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="Collapsed">
+                <ItemsControl x:Name="NextPageWidgets"
+                              Background="Transparent">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Vertical" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </ScrollViewer>
+            
+            <!-- Edge Click Zones (high Z-index to be above widgets) -->
+            <!-- Left edge - Previous page -->
+            <Border Width="25" 
+                    HorizontalAlignment="Left" 
+                    Background="Transparent" 
+                    MouseLeftButtonDown="LeftEdge_Click"
+                    Panel.ZIndex="100"
+                    Cursor="Hand"
+                    ToolTip="Click to go to previous page">
+                <!-- Visual indicator (optional, very subtle) -->
+                <Border Width="2" 
+                        HorizontalAlignment="Left"
+                        Background="#20FFFFFF"
+                        Opacity="0"/>
+            </Border>
+            
+            <!-- Right edge - Next page -->
+            <Border Width="25" 
+                    HorizontalAlignment="Right" 
+                    Background="Transparent" 
+                    MouseLeftButtonDown="RightEdge_Click"
+                    Panel.ZIndex="100"
+                    Cursor="Hand"
+                    ToolTip="Click to go to next page">
+                <!-- Visual indicator (optional, very subtle) -->
+                <Border Width="2" 
+                        HorizontalAlignment="Right"
+                        Background="#20FFFFFF"
+                        Opacity="0"/>
+            </Border>
+            
+            <!-- Top edge - Page selector -->
+            <Border Height="25" 
+                    VerticalAlignment="Top" 
+                    Background="Transparent" 
+                    MouseLeftButtonDown="TopEdge_Click"
+                    Panel.ZIndex="100"
+                    Cursor="Hand"
+                    ToolTip="Click to show page selector">
+                <!-- Visual indicator (optional, very subtle) -->
+                <Border Height="2" 
+                        VerticalAlignment="Top"
+                        Background="#20FFFFFF"
+                        Opacity="0"/>
+            </Border>
+        </Grid>
+        
+        <!-- Page Indicators -->
+        <StackPanel Grid.Row="1" 
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,10">
+            <ItemsControl ItemsSource="{Binding PageIndicators}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Ellipse Width="16" 
+                                 Height="16" 
+                                 Margin="8,0"
+                                 Fill="{Binding Fill}"
+                                 Cursor="Hand"
+                                 MouseLeftButtonDown="PageIndicator_Click"
+                                 Tag="{Binding PageIndex}"
+                                 ToolTip="{Binding PageName}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        
+        <!-- Page Selector Overlay -->
+        <Border x:Name="PageSelectorOverlay"
+                Grid.RowSpan="2"
+                Background="#CC000000"
+                Visibility="Collapsed">
+            <Grid>
+                <!-- iPhone-style notification-like panel -->
+                <Border Background="#FFFFFFFF"
+                        CornerRadius="20"
+                        Margin="20,50,20,200"
+                        BorderBrush="#FF666666"
+                        BorderThickness="2">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black"
+                                          BlurRadius="20"
+                                          ShadowDepth="5"
+                                          Opacity="0.3"/>
+                    </Border.Effect>
+
+                    <Grid Margin="25">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header with close button -->
+                        <Grid Grid.Row="0" Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Close Button -->
+                            <Button Grid.Column="2"
+                                    Width="30"
+                                    Height="30"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Click="ClosePageSelector_Click"
+                                    ToolTip="Close">
+                                <TextBlock Text="✕"
+                                           FontSize="18"
+                                           Foreground="#FF666666"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Button>
+
+                            <!-- Drag Handle (centered) -->
+                            <Border Grid.Column="1"
+                                    Width="40"
+                                    Height="4"
+                                    Background="#FFCCCCCC"
+                                    CornerRadius="2"
+                                    HorizontalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Header -->
+                        <TextBlock Grid.Row="1"
+                                   Text="Pages"
+                                   FontSize="28"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FF333333"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,25"/>
+
+                        <!-- Page Grid (iPhone-style) -->
+                        <ItemsControl Grid.Row="2"
+                                      x:Name="PageListItems"
+                                      ItemsSource="{Binding PageList}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="White"
+                                            Margin="8"
+                                            Padding="20,15"
+                                            CornerRadius="15"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="PageListItem_Click"
+                                            Tag="{Binding PageIndex}">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#FF000000"
+                                                              BlurRadius="8"
+                                                              ShadowDepth="2"
+                                                              Opacity="0.1"/>
+                                        </Border.Effect>
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="White"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#FFF5F5F5"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Page Number Circle -->
+                                            <Border Grid.Row="0"
+                                                    Width="40"
+                                                    Height="40"
+                                                    Background="{Binding Fill}"
+                                                    CornerRadius="20"
+                                                    HorizontalAlignment="Center"
+                                                    Margin="0,0,0,10">
+                                                <TextBlock Text="{Binding PageIndex, Converter={x:Static local:PageNumberConverter.Instance}}"
+                                                           Foreground="White"
+                                                           FontSize="18"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Page Name -->
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding PageName}"
+                                                       Foreground="#FF333333"
+                                                       FontSize="16"
+                                                       FontWeight="Medium"
+                                                       HorizontalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,0,0,5"/>
+
+                                            <!-- Widget Count -->
+                                            <TextBlock Grid.Row="2"
+                                                       Text="{Binding WidgetCount, StringFormat='{}{0} widgets'}"
+                                                       Foreground="#FF999999"
+                                                       FontSize="12"
+                                                       HorizontalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
+using DeskViz.Core.Models;
 
 namespace DeskViz.Core.Services
 {
@@ -74,7 +75,53 @@ namespace DeskViz.Core.Services
                 _settings = new AppSettings();
             }
             
+            // Migrate from old single-page system to multi-page if needed
+            MigrateToMultiPageSystem();
+            
             return _settings;
+        }
+        
+        /// <summary>
+        /// Migrates from the old single-page widget system to multi-page
+        /// </summary>
+        private void MigrateToMultiPageSystem()
+        {
+            // Always ensure we have at least one page
+            if (_settings.Pages.Count == 0)
+            {
+                var mainPage = new PageConfig("Main");
+                
+                // If we have existing widget configuration, use it
+                if (_settings.WidgetOrder.Count > 0)
+                {
+                    mainPage.WidgetIds = new List<string>(_settings.WidgetOrder);
+                    // Copy existing visibility settings
+                    foreach (var widgetId in mainPage.WidgetIds)
+                    {
+                        if (_settings.WidgetVisibility.TryGetValue(widgetId, out bool isVisible))
+                        {
+                            mainPage.WidgetVisibility[widgetId] = isVisible;
+                        }
+                        else
+                        {
+                            // Default to visible if not specified
+                            mainPage.WidgetVisibility[widgetId] = true;
+                        }
+                    }
+                }
+                else
+                {
+                    // Create default configuration with all widgets
+                    mainPage.WidgetIds = new List<string> { "CpuWidget", "RamWidget", "GpuWidget", "HardDriveWidget", "ClockWidget", "LogoWidget", "MediaControlWidget" };
+                    foreach (var widgetId in mainPage.WidgetIds)
+                    {
+                        mainPage.WidgetVisibility[widgetId] = true;
+                    }
+                }
+                
+                _settings.Pages.Add(mainPage);
+                SaveSettings();
+            }
         }
         
         /// <summary>
@@ -166,6 +213,71 @@ namespace DeskViz.Core.Services
             _settings.WidgetOrientation = orientation;
             SaveSettings();
         }
+        
+        /// <summary>
+        /// Adds a new page
+        /// </summary>
+        public void AddPage(string pageName)
+        {
+            var newPage = new PageConfig(pageName);
+            _settings.Pages.Add(newPage);
+            SaveSettings();
+        }
+        
+        /// <summary>
+        /// Removes a page by index
+        /// </summary>
+        public void RemovePage(int pageIndex)
+        {
+            if (pageIndex >= 0 && pageIndex < _settings.Pages.Count && _settings.Pages.Count > 1)
+            {
+                _settings.Pages.RemoveAt(pageIndex);
+                
+                // Adjust current page index if needed
+                if (_settings.CurrentPageIndex >= _settings.Pages.Count)
+                {
+                    _settings.CurrentPageIndex = _settings.Pages.Count - 1;
+                }
+                
+                SaveSettings();
+            }
+        }
+        
+        /// <summary>
+        /// Updates a page's configuration
+        /// </summary>
+        public void UpdatePage(int pageIndex, PageConfig pageConfig)
+        {
+            if (pageIndex >= 0 && pageIndex < _settings.Pages.Count)
+            {
+                _settings.Pages[pageIndex] = pageConfig;
+                SaveSettings();
+            }
+        }
+        
+        /// <summary>
+        /// Gets a page configuration by index
+        /// </summary>
+        public PageConfig? GetPage(int pageIndex)
+        {
+            if (pageIndex >= 0 && pageIndex < _settings.Pages.Count)
+            {
+                return _settings.Pages[pageIndex];
+            }
+            return null;
+        }
+        
+        /// <summary>
+        /// Updates the current page index
+        /// </summary>
+        public void SetCurrentPageIndex(int pageIndex)
+        {
+            if (pageIndex >= 0 && pageIndex < _settings.Pages.Count)
+            {
+                _settings.CurrentPageIndex = pageIndex;
+                SaveSettings();
+            }
+        }
     }
     
     /// <summary>
@@ -209,14 +321,24 @@ namespace DeskViz.Core.Services
         public int UpdateIntervalSeconds { get; set; } = 3;
         
         /// <summary>
-        /// Gets or sets the widget visibility settings
+        /// Gets or sets the widget visibility settings (deprecated - use Pages instead)
         /// </summary>
         public Dictionary<string, bool> WidgetVisibility { get; set; } = new Dictionary<string, bool>();
 
         /// <summary>
-        /// Gets or sets the order of widgets
+        /// Gets or sets the order of widgets (deprecated - use Pages instead)
         /// </summary>
         public List<string> WidgetOrder { get; set; } = new List<string>();
+
+        /// <summary>
+        /// Gets or sets the page configurations
+        /// </summary>
+        public List<PageConfig> Pages { get; set; } = new List<PageConfig>();
+
+        /// <summary>
+        /// Gets or sets the current page index
+        /// </summary>
+        public int CurrentPageIndex { get; set; } = 0;
         
         /// <summary>
         /// Gets or sets the user's preferred widget orientation.

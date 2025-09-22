@@ -9,6 +9,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseAppHost>true</UseAppHost>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

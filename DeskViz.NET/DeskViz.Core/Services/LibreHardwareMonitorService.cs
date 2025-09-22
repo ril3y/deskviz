@@ -31,7 +31,7 @@ namespace DeskViz.Core.Services
                 IsMotherboardEnabled = true,
                 IsControllerEnabled = true,
                 IsNetworkEnabled = false,
-                IsStorageEnabled = false,
+                IsStorageEnabled = true,
                 IsPsuEnabled = false
             };
 
@@ -522,6 +522,128 @@ namespace DeskViz.Core.Services
 
             return result;
         }
+
+        #region Drive Monitoring Methods
+
+        /// <summary>
+        /// Gets information for all available drives including usage percentages
+        /// </summary>
+        public List<(string Name, string Label, long TotalBytes, long UsedBytes, float UsagePercent)> GetDriveInfo()
+        {
+            var drives = new List<(string, string, long, long, float)>();
+
+            if (!_isInitialized)
+            {
+                return drives;
+            }
+
+            try
+            {
+                // Get drive info using System.IO.DriveInfo for space information
+                foreach (var drive in System.IO.DriveInfo.GetDrives())
+                {
+                    try
+                    {
+                        if (drive.IsReady && drive.DriveType == System.IO.DriveType.Fixed)
+                        {
+                            var totalBytes = drive.TotalSize;
+                            var availableBytes = drive.AvailableFreeSpace;
+                            var usedBytes = totalBytes - availableBytes;
+                            var usagePercent = totalBytes > 0 ? (float)(usedBytes * 100.0 / totalBytes) : 0f;
+
+                            var label = string.IsNullOrEmpty(drive.VolumeLabel) ? drive.Name : drive.VolumeLabel;
+                            drives.Add((drive.Name, label, totalBytes, usedBytes, usagePercent));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error reading drive {drive.Name}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting drive info: {ex.Message}");
+            }
+
+            return drives;
+        }
+
+        /// <summary>
+        /// Gets the temperature of a specific drive by name
+        /// </summary>
+        public float GetDriveTemperature(string driveName)
+        {
+            if (!_isInitialized)
+            {
+                return float.NaN;
+            }
+
+            try
+            {
+                // Get available storage device temperatures
+                var storageTemperatures = GetStorageTemperatures();
+
+                // For logical drives like C:, D:, etc., we'll use a round-robin approach
+                // to distribute temperatures from available storage devices
+                if (storageTemperatures.Any())
+                {
+                    // Simple mapping: use the drive letter to pick a storage device
+                    var driveIndex = driveName.Length > 0 ? driveName[0] - 'A' : 0;
+                    var temperatureIndex = driveIndex % storageTemperatures.Count;
+
+                    return storageTemperatures[temperatureIndex];
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting drive temperature for {driveName}: {ex.Message}");
+            }
+
+            return float.NaN;
+        }
+
+        /// <summary>
+        /// Gets all available storage device temperatures
+        /// </summary>
+        public List<float> GetStorageTemperatures()
+        {
+            var temperatures = new List<float>();
+
+            if (!_isInitialized)
+            {
+                return temperatures;
+            }
+
+            try
+            {
+                var storageDevices = _computer.Hardware
+                    .Where(h => h.HardwareType == HardwareType.Storage)
+                    .ToList();
+
+                foreach (var device in storageDevices)
+                {
+                    var tempSensor = device.Sensors
+                        .FirstOrDefault(s => s.SensorType == SensorType.Temperature &&
+                                           s.Value.HasValue &&
+                                           s.Value.Value > 0);
+
+                    if (tempSensor != null)
+                    {
+                        temperatures.Add(tempSensor.Value.Value);
+                        Debug.WriteLine($"Storage device {device.Name}: {tempSensor.Value.Value}°C");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting storage temperatures: {ex.Message}");
+            }
+
+            return temperatures;
+        }
+
+        #endregion
 
         public void Dispose()
         {

@@ -118,13 +118,28 @@ namespace DeskViz.App.Views
             // Apply widget order if changed
             if (_widgetOrderChanged)
             {
-                // Save widget order to settings
-                _settingsService.UpdateWidgetOrder(_widgets.Select(w => w.WidgetId).ToList());
-                
-                // Now we need to reorder the widgets in the UI, only if we're the owner
-                if (this.Owner is MainWindow mainWindow)
+                // Update the current page's widget order
+                var currentPageIndex = _settingsService.Settings.CurrentPageIndex;
+                var currentPage = _settingsService.GetPage(currentPageIndex);
+
+                if (currentPage != null)
                 {
-                    mainWindow.ReorderWidgets(_widgets);
+                    // Update the page's widget order
+                    currentPage.WidgetIds.Clear();
+                    foreach (var widget in _widgets)
+                    {
+                        currentPage.WidgetIds.Add(widget.WidgetId);
+                        currentPage.WidgetVisibility[widget.WidgetId] = widget.IsWidgetVisible;
+                    }
+
+                    // Save the updated page configuration
+                    _settingsService.UpdatePage(currentPageIndex, currentPage);
+
+                    // Now we need to reorder the widgets in the UI, only if we're the owner
+                    if (this.Owner is MainWindow mainWindow)
+                    {
+                        mainWindow.ReorderWidgets(_widgets);
+                    }
                 }
             }
             
@@ -142,20 +157,30 @@ namespace DeskViz.App.Views
                 // Get the main window instance
                 if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    // Create a dictionary of visibility settings
-                    Dictionary<string, bool> visibilitySettings = new Dictionary<string, bool>();
-                    
-                    foreach (var widget in _widgets)
+                    // Update the current page's widget configuration
+                    var currentPageIndex = _settingsService.Settings.CurrentPageIndex;
+                    var currentPage = _settingsService.GetPage(currentPageIndex);
+
+                    if (currentPage != null)
                     {
-                        // Update the Dictionary with the widget's visibility
-                        visibilitySettings[widget.WidgetId] = widget.IsWidgetVisible;
+                        // Update the page's widget visibility settings
+                        foreach (var widget in _widgets)
+                        {
+                            currentPage.WidgetVisibility[widget.WidgetId] = widget.IsWidgetVisible;
+
+                            // Also ensure the widget is in the page's widget list if visible
+                            if (widget.IsWidgetVisible && !currentPage.WidgetIds.Contains(widget.WidgetId))
+                            {
+                                currentPage.WidgetIds.Add(widget.WidgetId);
+                            }
+                        }
+
+                        // Save the updated page configuration
+                        _settingsService.UpdatePage(currentPageIndex, currentPage);
+
+                        // Apply the changes to the UI
+                        mainWindow.ApplyWidgetVisibilitySettings();
                     }
-                    
-                    // Save the settings
-                    _settingsService.UpdateWidgetVisibility(visibilitySettings);
-                    
-                    // Apply the changes to the UI
-                    mainWindow.ApplyWidgetVisibilitySettings();
                 }
             }
         }

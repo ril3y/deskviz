@@ -47,5 +47,9 @@ namespace DeskViz.Core.Services
         // GPU enumeration
         int GetGpuCount();
         List<(int Index, string Name, string Type)> GetAvailableGpus();
+
+        // Drive monitoring methods
+        List<(string Name, string Label, long TotalBytes, long UsedBytes, float UsagePercent)> GetDriveInfo();
+        float GetDriveTemperature(string driveName);
     }
 }
