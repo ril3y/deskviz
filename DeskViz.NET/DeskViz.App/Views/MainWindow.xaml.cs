@@ -6,10 +6,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using DeskViz.App.Widgets;
-using DeskViz.App.Widgets.GpuWidget;
-using DeskViz.App.Widgets.MediaControlWidget;
+using System.IO;
+using DeskViz.App.Services;
 using DeskViz.Core.Services;
+using DeskViz.Plugins.Services;
+using DeskViz.Plugins.Interfaces;
 using ScreenInfo = DeskViz.Core.Services.ScreenInfo;
 
 namespace DeskViz.App.Views
@@ -25,13 +26,18 @@ namespace DeskViz.App.Views
         private readonly IMediaControlService _mediaControlService; // Added for media control
         private readonly ISystemTrayService _systemTrayService;
         private readonly AutoRotationService _autoRotationService;
-        private List<IWidget> _allWidgets = new List<IWidget>();
+        private List<IWidgetPlugin> _allWidgets = new List<IWidgetPlugin>();
+
+        // Plugin system
+        private readonly WidgetDiscoveryService? _widgetDiscoveryService;
+        private readonly WidgetManager? _widgetManager;
+        private readonly IWidgetHost? _widgetHost;
         
         // TODO: Add swipe tracking variables when implementing gestures
 
         public MainWindow()
         {
-            Debug.WriteLine("MainWindow constructor started.");
+            Debug.WriteLine("===== MainWindow constructor started =====");
 
             // Initialize services early to satisfy nullable checks, even if InitComponent fails
             _settingsService = new SettingsService();
@@ -40,6 +46,32 @@ namespace DeskViz.App.Views
             _mediaControlService = new WindowsMediaControlService(); // Create media control service
             _systemTrayService = new SystemTrayService();
             _autoRotationService = new AutoRotationService(_settingsService);
+
+            // Initialize plugin system
+            try
+            {
+                Debug.WriteLine("Starting plugin system initialization...");
+                var pluginDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WidgetOutput");
+                Debug.WriteLine($"Plugin directory: {pluginDirectory}");
+
+                var serviceProvider = new AppWidgetServiceProvider(_hardwareMonitorService, _mediaControlService);
+                _widgetHost = new PluginHost(serviceProvider);
+                _widgetDiscoveryService = new WidgetDiscoveryService(pluginDirectory);
+                _widgetManager = new WidgetManager(_widgetDiscoveryService, _widgetHost);
+
+                // Subscribe to plugin events
+                _widgetManager.WidgetActivated += OnPluginWidgetActivated;
+                _widgetManager.WidgetDeactivated += OnPluginWidgetDeactivated;
+                _widgetManager.WidgetError += OnPluginWidgetError;
+
+                Debug.WriteLine("Plugin system initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error initializing plugin system: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                // Continue without plugin system
+            }
 
             try
             {
@@ -86,49 +118,34 @@ namespace DeskViz.App.Views
 
         private void RegisterWidgets()
         {
-            // Create CPU widget
-            var cpuWidget = new CpuWidget(_hardwareMonitorService, _settingsService);
-            cpuWidget.DataContext = cpuWidget; // Set DataContext
-            cpuWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
-            _allWidgets.Add(cpuWidget);
-            // WidgetPanel.Children.Add(cpuWidget); // REMOVED direct add
+            Debug.WriteLine("RegisterWidgets started");
 
-            // Create Logo widget
-            var logoWidget = new LogoWidget(_settingsService); // Pass SettingsService
-            logoWidget.DataContext = logoWidget;
-            logoWidget.ConfigButtonClicked += Widget_ConfigButtonClicked; // Use the generic handler
-            _allWidgets.Add(logoWidget);
+            try
+            {
+                // Discover plugin widgets first
+                if (_widgetManager != null)
+                {
+                    Debug.WriteLine("Attempting to refresh available widgets...");
+                    _widgetManager.RefreshAvailableWidgets();
+                    Debug.WriteLine($"Discovered {_widgetManager.AvailableWidgets.Count} plugin widgets");
 
-            // Create RAM widget
-            var ramWidget = new RamWidget(_hardwareMonitorService, _settingsService); // Pass SettingsService
-            ramWidget.DataContext = ramWidget; // Set DataContext
-            ramWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
-            _allWidgets.Add(ramWidget);
-            // WidgetPanel.Children.Add(ramWidget); // REMOVED direct add
-            
-            // Create GPU widget
-            var gpuWidget = new GpuWidget(_hardwareMonitorService, _settingsService);
-            gpuWidget.DataContext = gpuWidget; // Set DataContext
-            gpuWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
-            _allWidgets.Add(gpuWidget);
+                    // Register discovered plugin widgets first
+                    RegisterPluginWidgets();
+                }
+                else
+                {
+                    Debug.WriteLine("Widget manager is null, skipping plugin discovery");
+                }
 
-            // Create Hard Drive widget
-            var hardDriveWidget = new HardDriveWidget(_hardwareMonitorService, _settingsService);
-            hardDriveWidget.DataContext = hardDriveWidget; // Set DataContext
-            hardDriveWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
-            _allWidgets.Add(hardDriveWidget);
+                // Only use plugins now - no more built-in widgets
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in RegisterWidgets: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
 
-            // Create Clock widget
-            var clockWidget = new ClockWidget(_settingsService); // Pass SettingsService
-            clockWidget.DataContext = clockWidget;
-            clockWidget.ConfigButtonClicked += Widget_ConfigButtonClicked; // Although unused in ClockWidget, keep consistency
-            _allWidgets.Add(clockWidget);
-            
-            // Create Media Control widget
-            var mediaControlWidget = new MediaControlWidget(_mediaControlService, _settingsService);
-            mediaControlWidget.DataContext = mediaControlWidget;
-            mediaControlWidget.ConfigButtonClicked += Widget_ConfigButtonClicked;
-            _allWidgets.Add(mediaControlWidget);
+                // No fallback widgets - only plugins
+            }
 
             /*
             // Create YouTube Music widget
@@ -183,7 +200,14 @@ namespace DeskViz.App.Views
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("Window_Loaded started.");
-            
+
+            // Check if this is the first run - show display selection dialog
+            if (_settingsService.Settings.IsFirstRun)
+            {
+                Debug.WriteLine("First run detected - showing display selection dialog.");
+                ShowFirstRunDisplaySelection();
+            }
+
             // Apply display settings and show the window normally
             ScreenInfo? targetScreen = ApplyDisplaySettings();
             if (targetScreen != null)
@@ -195,8 +219,53 @@ namespace DeskViz.App.Views
             {
                 ApplyFullscreen();
             }
-            
+
             Debug.WriteLine("Window_Loaded finished.");
+        }
+
+        /// <summary>
+        /// Shows the display selection dialog on first run
+        /// </summary>
+        private void ShowFirstRunDisplaySelection()
+        {
+            var screens = _screenService.GetAllScreens();
+            if (screens.Count == 0)
+            {
+                Debug.WriteLine("No screens detected for first run dialog.");
+                _settingsService.MarkFirstRunComplete();
+                return;
+            }
+
+            // If only one screen, just save it and skip the dialog
+            if (screens.Count == 1)
+            {
+                Debug.WriteLine("Only one screen detected - skipping dialog and using it.");
+                _settingsService.UpdatePreferredDisplay(screens[0].Identifier);
+                _settingsService.MarkFirstRunComplete();
+                return;
+            }
+
+            // Show the display selection dialog
+            var dialog = new DisplaySelectionDialog(screens);
+
+            if (dialog.ShowDialog() == true && dialog.SelectedScreen != null)
+            {
+                Debug.WriteLine($"User selected display: {dialog.SelectedScreen.DisplayName}");
+                _settingsService.UpdatePreferredDisplay(dialog.SelectedScreen.Identifier);
+            }
+            else
+            {
+                // User closed without selecting - use primary screen
+                var primaryScreen = _screenService.GetPrimaryScreen();
+                if (primaryScreen != null)
+                {
+                    Debug.WriteLine("No selection made - defaulting to primary screen.");
+                    _settingsService.UpdatePreferredDisplay(primaryScreen.Identifier);
+                }
+            }
+
+            // Mark first run as complete
+            _settingsService.MarkFirstRunComplete();
         }
 
         /// <summary>
@@ -327,7 +396,7 @@ namespace DeskViz.App.Views
         /// Reorders the widgets in the UI according to the given list
         /// </summary>
         /// <param name="widgets">List of widgets in the desired order</param>
-        public void ReorderWidgets(IEnumerable<IWidget> widgets)
+        public void ReorderWidgets(IEnumerable<IWidgetPlugin> widgets)
         {
             // With the new paged system, we need to update the current page's widget order
             if (widgets == null || _settingsService == null)
@@ -481,7 +550,12 @@ namespace DeskViz.App.Views
         private void EnsureAllWidgetsInPages()
         {
             if (_allWidgets == null || _settingsService == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureAllWidgetsInPages: _allWidgets or _settingsService is null");
                 return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"EnsureAllWidgetsInPages: Found {_allWidgets.Count} total widgets");
 
             // Get all widget IDs that are in pages
             var widgetsInPages = new HashSet<string>();
@@ -612,7 +686,7 @@ namespace DeskViz.App.Views
             // Notify auto-rotation of user interaction
             OnUserInteraction();
 
-            if (sender is IWidget widget)
+            if (sender is IWidgetPlugin widget)
             {
                 // Open the widget's specific settings dialog
                 widget.OpenWidgetSettings();
@@ -837,8 +911,17 @@ namespace DeskViz.App.Views
                 var currentPageIndex = PagedContainer.CurrentPageIndex;
                 Debug.WriteLine($"Refreshing page display for page {currentPageIndex}");
 
-                // Re-initialize the PagedContainer with updated settings
-                PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+                // Only initialize if not already initialized, otherwise just add new widgets
+                if (!PagedContainer.IsContainerInitialized)
+                {
+                    Debug.WriteLine("Initializing PagedContainer for the first time");
+                    PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
+                }
+                else
+                {
+                    Debug.WriteLine("Adding new widgets to existing container");
+                    PagedContainer.AddNewWidgets(_allWidgets);
+                }
 
                 // Restore the current page index
                 PagedContainer.CurrentPageIndex = currentPageIndex;
@@ -856,7 +939,108 @@ namespace DeskViz.App.Views
             // Test the page selector by calling the public method we'll add
             PagedContainer.TestShowPageSelector();
         }
-        
+
+
+        private void RegisterPluginWidgets()
+        {
+            Console.WriteLine("🔥 ATTEMPTING TO LOAD PLUGIN WIDGETS FROM DLLs");
+
+            if (_widgetManager == null)
+            {
+                Console.WriteLine("❌ Widget manager is null - plugin system failed to initialize");
+                return;
+            }
+
+            Console.WriteLine($"🔍 Found {_widgetManager.AvailableWidgets.Count} plugin widgets");
+
+            // Activate discovered plugin widgets
+            foreach (var loadedWidget in _widgetManager.AvailableWidgets)
+            {
+                try
+                {
+                    Console.WriteLine($"🔥 LOADING PLUGIN: {loadedWidget.Metadata.Id} ({loadedWidget.Metadata.Name})");
+
+                    // Check if we already have a built-in widget with the same ID
+                    var existingWidget = _allWidgets.FirstOrDefault(w => w.WidgetId == loadedWidget.Metadata.Id);
+                    if (existingWidget != null)
+                    {
+                        Console.WriteLine($"🔄 Replacing built-in widget '{loadedWidget.Metadata.Id}' with plugin version");
+                        _allWidgets.Remove(existingWidget);
+                    }
+
+                    // Activate the plugin widget
+                    if (_widgetManager.ActivateWidget(loadedWidget.Metadata.Id))
+                    {
+                        Console.WriteLine($"✅ SUCCESS: Activated plugin widget: {loadedWidget.Metadata.Id}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"❌ FAILED: Could not activate plugin widget: {loadedWidget.Metadata.Id}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ ERROR: Failed to register plugin widget '{loadedWidget.Metadata.Id}': {ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"🔥 PLUGIN LOADING COMPLETE");
+        }
+
+        private void OnPluginWidgetActivated(object? sender, WidgetActivatedEventArgs e)
+        {
+            try
+            {
+                Debug.WriteLine($"Plugin widget activated: {e.Widget.WidgetId}");
+
+                // Initialize the plugin widget with host
+                e.Widget.Initialize(_widgetHost!);
+
+                // Add the plugin widget directly
+                _allWidgets.Add(e.Widget);
+
+                // Ensure this new widget is added to pages
+                EnsureAllWidgetsInPages();
+
+                // If we have pages set up, refresh the display
+                if (_settingsService?.Settings.Pages.Count > 0)
+                {
+                    RefreshCurrentPageDisplay();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error handling plugin widget activation: {ex.Message}");
+            }
+        }
+
+        private void OnPluginWidgetDeactivated(object? sender, WidgetDeactivatedEventArgs e)
+        {
+            try
+            {
+                Debug.WriteLine($"Plugin widget deactivated: {e.WidgetId}");
+
+                // Remove the plugin widget from the widgets list
+                var widget = _allWidgets.FirstOrDefault(w => w.WidgetId == e.WidgetId);
+
+                if (widget != null)
+                {
+                    _allWidgets.Remove(widget);
+                    RefreshCurrentPageDisplay();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error handling plugin widget deactivation: {ex.Message}");
+            }
+        }
+
+        private void OnPluginWidgetError(object? sender, WidgetErrorEventArgs e)
+        {
+            Debug.WriteLine($"Plugin widget error in '{e.WidgetId}': {e.Exception.Message}");
+            // Could show a notification or error dialog here
+        }
+
         // TODO: Add swipe gestures later after basic functionality works
     }
 }

@@ -158,6 +158,15 @@ namespace DeskViz.Core.Services
             _settings.PreferredDisplayIdentifier = screenIdentifier;
             SaveSettings();
         }
+
+        /// <summary>
+        /// Marks the first run as complete
+        /// </summary>
+        public void MarkFirstRunComplete()
+        {
+            _settings.IsFirstRun = false;
+            SaveSettings();
+        }
         
         /// <summary>
         /// Updates widget visibility
@@ -407,6 +416,11 @@ namespace DeskViz.Core.Services
     /// </summary>
     public class AppSettings
     {
+        /// <summary>
+        /// Gets or sets whether this is the first run of the application
+        /// </summary>
+        public bool IsFirstRun { get; set; } = true;
+
         /// <summary>
         /// Gets or sets the preferred display identifier
         /// </summary>
