@@ -11,6 +11,12 @@
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <UseAppHost>true</UseAppHost>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- Single-file publish settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DeskViz.Core\DeskViz.Core.csproj" />
+    <ProjectReference Include="..\DeskViz.Plugins\DeskViz.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,6 +43,15 @@
 
   <ItemGroup>
     <Resource Include="Resources\deskviz.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
   </ItemGroup>
 
 </Project>

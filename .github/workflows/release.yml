@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: DeskViz.NET
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build -c Release --no-restore
+
+      - name: Run tests
+        run: dotnet test -c Release --no-build --verbosity normal
+
+      - name: Build plugins
+        run: |
+          dotnet build DeskViz.Widgets.Clock/DeskViz.Widgets.Clock.csproj -c Release --no-restore
+          dotnet build DeskViz.Widgets.Cpu/DeskViz.Widgets.Cpu.csproj -c Release --no-restore
+          dotnet build DeskViz.Widgets.Ram/DeskViz.Widgets.Ram.csproj -c Release --no-restore
+          dotnet build DeskViz.Widgets.Logo/DeskViz.Widgets.Logo.csproj -c Release --no-restore
+          dotnet build DeskViz.Widgets.Meshtastic/DeskViz.Widgets.Meshtastic.csproj -c Release --no-restore
+
+      - name: Publish app
+        working-directory: .
+        run: >
+          dotnet publish DeskViz.NET/DeskViz.App/DeskViz.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o publish-output
+
+      - name: Create widgets archive
+        shell: pwsh
+        run: Compress-Archive -Path WidgetOutput\* -DestinationPath ..\widgets.zip
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: cmd
+        working-directory: .
+        run: >
+          iscc
+          /DMyAppVersion=${{ steps.version.outputs.VERSION }}
+          /DPublishDir=../../publish-output
+          /DWidgetOutputDir=../WidgetOutput
+          /DRepoRoot=..
+          /DOutputDir=../../installer-output
+          "DeskViz.NET/installer/deskviz-setup.iss"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DeskViz v${{ steps.version.outputs.VERSION }}
+          prerelease: ${{ steps.version.outputs.PRERELEASE }}
+          generate_release_notes: true
+          files: |
+            publish-output/DeskViz.App.exe
+            widgets.zip
+            installer-output/DeskViz-Setup-*.exe

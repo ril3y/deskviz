@@ -105,6 +105,19 @@ namespace DeskViz.App.Controls
             set { SetValue(TextBrushProperty, value); }
         }
 
+        // AnimationDuration Dependency Property
+        public static readonly DependencyProperty AnimationDurationProperty =
+            DependencyProperty.Register(nameof(AnimationDuration), typeof(double), typeof(DeskVizProgressBar), new PropertyMetadata(500.0));
+
+        /// <summary>
+        /// Gets or sets the animation duration in milliseconds. Set to 0 for instant updates (no animation).
+        /// </summary>
+        public double AnimationDuration
+        {
+            get { return (double)GetValue(AnimationDurationProperty); }
+            set { SetValue(AnimationDurationProperty, value); }
+        }
+
         // Update ValueText when Value or Maximum changes
         private static void OnValuePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {

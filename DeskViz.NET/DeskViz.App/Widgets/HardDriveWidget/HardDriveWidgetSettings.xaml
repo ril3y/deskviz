@@ -42,21 +42,6 @@
                       Margin="0,10"
                       IsChecked="{Binding ShowLabel}"/>
 
-            <!-- Update Interval -->
-            <StackPanel Orientation="Horizontal" Margin="0,10">
-                <TextBlock Text="Update interval (seconds):"
-                           Foreground="White"
-                           VerticalAlignment="Center"
-                           Width="150"/>
-                <TextBox x:Name="UpdateIntervalTextBox"
-                         Text="{Binding UpdateIntervalSeconds}"
-                         Width="100"
-                         Background="#FF3E3E42"
-                         Foreground="White"
-                         BorderBrush="#FF007ACC"
-                         Padding="5,2"/>
-            </StackPanel>
-
             <!-- Drive Selection -->
             <TextBlock Text="Select Drives to Display:"
                        Foreground="White"

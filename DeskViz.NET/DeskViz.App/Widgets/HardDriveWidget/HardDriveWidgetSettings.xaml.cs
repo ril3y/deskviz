@@ -53,18 +53,7 @@ namespace DeskViz.App.Widgets
         {
             try
             {
-                // Validate and apply settings
-                if (double.TryParse(UpdateIntervalTextBox.Text, out double interval) && interval > 0)
-                {
-                    _widget.UpdateIntervalSeconds = interval;
-                }
-                else
-                {
-                    System.Windows.MessageBox.Show("Please enter a valid update interval (positive number).", "Invalid Input",
-                                  MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
+                // Apply settings
                 _widget.ShowTemperature = ShowTemperatureCheckBox.IsChecked ?? false;
                 _widget.ShowLabel = ShowLabelCheckBox.IsChecked ?? false;
 

@@ -11,7 +11,11 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Microsoft.Extensions.Logging;
+using DeskViz.App.Services;
 using DeskViz.App.Widgets;
+using DeskViz.Plugins.Interfaces;
+using DeskViz.Plugins.Base;
 using DeskViz.Core.Models;
 
 namespace DeskViz.App.Controls
@@ -21,11 +25,21 @@ namespace DeskViz.App.Controls
     /// </summary>
     public partial class PagedWidgetContainer : System.Windows.Controls.UserControl, INotifyPropertyChanged
     {
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<PagedWidgetContainer>();
         private List<PageConfig> _pages = new List<PageConfig>();
-        private List<IWidget> _allWidgets = new List<IWidget>();
+        private List<IWidgetPlugin> _allWidgets = new List<IWidgetPlugin>();
         private int _currentPageIndex = 0;
         private ObservableCollection<PageIndicator> _pageIndicators = new ObservableCollection<PageIndicator>();
         private ObservableCollection<PageListItem> _pageList = new ObservableCollection<PageListItem>();
+
+        // Track widget UI elements to avoid recreating them
+        private readonly Dictionary<string, UIElement> _widgetUICache = new Dictionary<string, UIElement>();
+        private bool _widgetsInitialized = false;
+
+        /// <summary>
+        /// Gets whether the container has been initialized
+        /// </summary>
+        public bool IsContainerInitialized => _widgetsInitialized;
         
         // Swipe down gesture detection
         private System.Windows.Point _swipeStartPoint;
@@ -54,18 +68,18 @@ namespace DeskViz.App.Controls
             get => _currentPageIndex;
             set
             {
-                System.Diagnostics.Debug.WriteLine($"Setting CurrentPageIndex from {_currentPageIndex} to {value}");
+                _logger.LogDebug($"Setting CurrentPageIndex from {_currentPageIndex} to {value}");
                 if (value >= 0 && value < _pages.Count)
                 {
                     _currentPageIndex = value;
                     OnPropertyChanged();
                     LoadCurrentPage();
                     UpdatePageIndicators();
-                    System.Diagnostics.Debug.WriteLine($"CurrentPageIndex set to {_currentPageIndex}");
+                    _logger.LogDebug($"CurrentPageIndex set to {_currentPageIndex}");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"CurrentPageIndex {value} out of bounds (0-{_pages.Count - 1})");
+                    _logger.LogWarning($"CurrentPageIndex {value} out of bounds (0-{_pages.Count - 1})");
                 }
             }
         }
@@ -95,19 +109,23 @@ namespace DeskViz.App.Controls
             Stylus.SetIsFlicksEnabled(this, false);
             Stylus.SetIsTapFeedbackEnabled(this, false);
 
-            System.Diagnostics.Debug.WriteLine($"[INIT] Touch support enabled for PagedWidgetContainer");
-            Console.WriteLine($"[INIT] Touch support enabled for PagedWidgetContainer");
+            _logger.LogInformation($"[INIT] Touch support enabled for PagedWidgetContainer");
         }
 
         /// <summary>
         /// Sets up the container with pages and widgets
         /// </summary>
-        public void Initialize(List<PageConfig> pages, List<IWidget> allWidgets)
+        public void Initialize(List<PageConfig> pages, List<IWidgetPlugin> allWidgets)
         {
-            System.Diagnostics.Debug.WriteLine($"Initializing PagedWidgetContainer with {pages?.Count ?? 0} pages and {allWidgets?.Count ?? 0} widgets");
-            
+            _logger.LogInformation($"Initializing PagedWidgetContainer with {pages?.Count ?? 0} pages and {allWidgets?.Count ?? 0} widgets");
+
             _pages = pages ?? new List<PageConfig>();
-            _allWidgets = allWidgets ?? new List<IWidget>();
+            _allWidgets = allWidgets ?? new List<IWidgetPlugin>();
+
+            // Clear previous widget initialization
+            CurrentPageWidgets.Items.Clear();
+            _widgetUICache.Clear();
+            _widgetsInitialized = false;
 
             if (_pages.Count == 0)
             {
@@ -122,7 +140,7 @@ namespace DeskViz.App.Controls
         }
 
         /// <summary>
-        /// Loads widgets for the current page
+        /// Loads widgets for the current page using visibility-based switching
         /// </summary>
         private void LoadCurrentPage()
         {
@@ -130,43 +148,255 @@ namespace DeskViz.App.Controls
                 return;
 
             var currentPage = _pages[_currentPageIndex];
-            CurrentPageWidgets.Items.Clear();
 
             // Debug: Log page info
-            System.Diagnostics.Debug.WriteLine($"Loading page {_currentPageIndex}: {currentPage.Name}");
-            System.Diagnostics.Debug.WriteLine($"Page has {currentPage.WidgetIds.Count} widgets");
+            _logger.LogDebug($"Loading page {_currentPageIndex}: {currentPage.Name}");
+            _logger.LogDebug($"Page has {currentPage.WidgetIds.Count} widgets");
 
-            // Add widgets based on page configuration
-            foreach (var widgetId in currentPage.WidgetIds)
+            // Initialize widgets only once to preserve timers and animations
+            if (!_widgetsInitialized)
             {
-                var widget = _allWidgets.FirstOrDefault(w => w.WidgetId == widgetId);
-                if (widget != null && widget is UIElement uiElement)
+                InitializeAllWidgets();
+                _widgetsInitialized = true;
+            }
+
+            // Update visibility based on current page configuration
+            UpdateWidgetVisibility(currentPage);
+
+            // Notify all widgets about the page change so they can load page-specific settings
+            NotifyWidgetsOfPageChange(currentPage);
+
+            _logger.LogDebug($"Page switch completed - widgets remain in visual tree");
+        }
+
+        /// <summary>
+        /// Notifies all widgets of page changes so they can load page-specific settings
+        /// </summary>
+        private void NotifyWidgetsOfPageChange(PageConfig currentPage)
+        {
+            foreach (var kvp in _widgetUICache)
+            {
+                var uiElement = kvp.Value;
+                if (uiElement is BaseWidget widget)
                 {
-                    // Check visibility setting for this page (default to true if not specified)
-                    bool isVisible = true;
-                    if (currentPage.WidgetVisibility.ContainsKey(widgetId))
+                    try
                     {
-                        isVisible = currentPage.WidgetVisibility[widgetId];
+                        widget.OnPageChanged(currentPage.Id);
+                        _logger.LogDebug($"Notified widget {widget.WidgetId} of page change to {currentPage.Id}");
                     }
-                    
-                    if (isVisible)
+                    catch (Exception ex)
                     {
-                        // Add margin to widgets
-                        if (uiElement is FrameworkElement frameworkElement)
-                        {
-                            frameworkElement.Margin = new Thickness(10, 5, 10, 10);
-                        }
-                        CurrentPageWidgets.Items.Add(uiElement);
-                        System.Diagnostics.Debug.WriteLine($"Added widget: {widgetId}");
+                        _logger.LogError($"Error notifying widget {widget.WidgetId} of page change: {ex.Message}");
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Initializes all widgets once and adds them to the visual tree
+        /// </summary>
+        private void InitializeAllWidgets()
+        {
+            _logger.LogDebug($"Initializing all widgets - Available: {string.Join(", ", _allWidgets.Select(w => w.WidgetId))}");
+
+            foreach (var widget in _allWidgets)
+            {
+                if (_widgetUICache.ContainsKey(widget.WidgetId))
+                    continue; // Already initialized
+
+                _logger.LogDebug($"Initializing widget: {widget.WidgetId}");
+                UIElement? uiElement = null;
+
+                // Handle plugin widgets vs old-style widgets
+                var widgetType = widget.GetType();
+                bool isPluginWidget = widgetType.Assembly != System.Reflection.Assembly.GetExecutingAssembly();
+
+                if (isPluginWidget)
+                {
+                    // Plugin widget - create UI via CreateWidgetUI()
+                    _logger.LogDebug($"Creating UI via CreateWidgetUI() for plugin widget: {widget.WidgetId}");
+                    try
+                    {
+                        uiElement = widget.CreateWidgetUI();
+                        _logger.LogDebug($"CreateWidgetUI() succeeded for {widget.WidgetId}: {uiElement?.GetType().Name ?? "null"}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning($"CreateWidgetUI() failed for {widget.WidgetId}: {ex.Message}");
+                        uiElement = null;
+                    }
+                }
+                else if (widget is UIElement directElement)
+                {
+                    // Old-style widget that's directly a UI element
+                    _logger.LogDebug($"Using direct UI element for hardcoded widget: {widget.WidgetId}");
+                    uiElement = directElement;
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Widget not found: {widgetId}");
+                    _logger.LogDebug($"Unknown widget type for {widget.WidgetId}: {widgetType.FullName}");
+                    uiElement = null;
+                }
+
+                if (uiElement != null)
+                {
+                    // Add margin to widgets
+                    if (uiElement is FrameworkElement frameworkElement)
+                    {
+                        frameworkElement.Margin = new Thickness(10, 5, 10, 10);
+                    }
+
+                    // Cache the widget UI and add to visual tree
+                    _widgetUICache[widget.WidgetId] = uiElement;
+                    CurrentPageWidgets.Items.Add(uiElement);
+                    _logger.LogDebug($"Initialized and cached widget: {widget.WidgetId}");
+                }
+                else
+                {
+                    _logger.LogWarning($"Widget UI creation failed: {widget.WidgetId}");
                 }
             }
-            
-            System.Diagnostics.Debug.WriteLine($"Total widgets loaded: {CurrentPageWidgets.Items.Count}");
+        }
+
+        /// <summary>
+        /// Updates widget visibility and order based on current page configuration
+        /// </summary>
+        private void UpdateWidgetVisibility(PageConfig currentPage)
+        {
+            // Reorder items in the ItemsControl to match WidgetIds order
+            CurrentPageWidgets.Items.Clear();
+
+            // First add widgets in the order specified by the page config
+            foreach (var widgetId in currentPage.WidgetIds)
+            {
+                if (_widgetUICache.TryGetValue(widgetId, out var uiElement))
+                {
+                    bool shouldBeVisible = currentPage.WidgetVisibility.GetValueOrDefault(widgetId, true);
+                    uiElement.Visibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
+                    CurrentPageWidgets.Items.Add(uiElement);
+                    _logger.LogDebug($"Widget {widgetId}: {(shouldBeVisible ? "Visible" : "Hidden")} (ordered)");
+                }
+            }
+
+            // Then add any remaining cached widgets not in this page's list (hidden)
+            foreach (var kvp in _widgetUICache)
+            {
+                if (!currentPage.WidgetIds.Contains(kvp.Key))
+                {
+                    kvp.Value.Visibility = Visibility.Collapsed;
+                    CurrentPageWidgets.Items.Add(kvp.Value);
+                    _logger.LogDebug($"Widget {kvp.Key}: Hidden (not on page)");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Adds new widgets to the container without reinitializing existing ones
+        /// </summary>
+        public void AddNewWidgets(List<IWidgetPlugin> allWidgets)
+        {
+            _logger.LogDebug($"Adding new widgets - Total available: {allWidgets.Count}, Currently cached: {_widgetUICache.Count}");
+
+            // Update the widget list
+            _allWidgets = allWidgets ?? new List<IWidgetPlugin>();
+
+            // Only initialize widgets that aren't already cached
+            foreach (var widget in _allWidgets)
+            {
+                if (!_widgetUICache.ContainsKey(widget.WidgetId))
+                {
+                    _logger.LogDebug($"Adding new widget: {widget.WidgetId}");
+                    InitializeSingleWidget(widget);
+                }
+            }
+
+            // Update visibility for current page
+            if (_currentPageIndex >= 0 && _currentPageIndex < _pages.Count)
+            {
+                UpdateWidgetVisibility(_pages[_currentPageIndex]);
+            }
+        }
+
+        /// <summary>
+        /// Updates the page list and refreshes the display without reinitializing widgets.
+        /// Call this after pages are added/removed/reordered in settings.
+        /// </summary>
+        public void SyncPages(List<PageConfig> pages)
+        {
+            _logger.LogDebug($"SyncPages called: {pages.Count} pages (was {_pages.Count})");
+            _pages = pages ?? new List<PageConfig>();
+
+            // Clamp current page index if pages were removed
+            if (_currentPageIndex >= _pages.Count)
+            {
+                _currentPageIndex = Math.Max(0, _pages.Count - 1);
+            }
+
+            // Refresh visibility and indicators for the current page
+            if (_pages.Count > 0 && _currentPageIndex >= 0 && _currentPageIndex < _pages.Count)
+            {
+                UpdateWidgetVisibility(_pages[_currentPageIndex]);
+            }
+            UpdatePageIndicators();
+            OnPropertyChanged(nameof(CurrentPageIndex));
+        }
+
+        /// <summary>
+        /// Initializes a single widget and adds it to the cache
+        /// </summary>
+        private void InitializeSingleWidget(IWidgetPlugin widget)
+        {
+            _logger.LogDebug($"Initializing single widget: {widget.WidgetId}");
+            UIElement? uiElement = null;
+
+            // Handle plugin widgets vs old-style widgets
+            var widgetType = widget.GetType();
+            bool isPluginWidget = widgetType.Assembly != System.Reflection.Assembly.GetExecutingAssembly();
+
+            if (isPluginWidget)
+            {
+                // Plugin widget - create UI via CreateWidgetUI()
+                _logger.LogDebug($"Creating UI via CreateWidgetUI() for plugin widget: {widget.WidgetId}");
+                try
+                {
+                    uiElement = widget.CreateWidgetUI();
+                    _logger.LogDebug($"CreateWidgetUI() succeeded for {widget.WidgetId}: {uiElement?.GetType().Name ?? "null"}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"CreateWidgetUI() failed for {widget.WidgetId}: {ex.Message}");
+                    uiElement = null;
+                }
+            }
+            else if (widget is UIElement directElement)
+            {
+                // Old-style widget that's directly a UI element
+                _logger.LogDebug($"Using direct UI element for hardcoded widget: {widget.WidgetId}");
+                uiElement = directElement;
+            }
+            else
+            {
+                _logger.LogDebug($"Unknown widget type for {widget.WidgetId}: {widgetType.FullName}");
+                uiElement = null;
+            }
+
+            if (uiElement != null)
+            {
+                // Add margin to widgets
+                if (uiElement is FrameworkElement frameworkElement)
+                {
+                    frameworkElement.Margin = new Thickness(10, 5, 10, 10);
+                }
+
+                // Cache the widget UI and add to visual tree
+                _widgetUICache[widget.WidgetId] = uiElement;
+                CurrentPageWidgets.Items.Add(uiElement);
+                _logger.LogDebug($"Initialized and cached new widget: {widget.WidgetId}");
+            }
+            else
+            {
+                _logger.LogWarning($"Widget UI creation failed: {widget.WidgetId}");
+            }
         }
 
         /// <summary>
@@ -272,8 +502,7 @@ namespace DeskViz.App.Controls
             e.Mode = ManipulationModes.All; // Enable all manipulation modes
             _isManipulating = false;
 
-            System.Diagnostics.Debug.WriteLine($"[TOUCH] Manipulation starting with {e.Manipulators.Count()} fingers");
-            Console.WriteLine($"[TOUCH] Manipulation starting with {e.Manipulators.Count()} fingers");
+            _logger.LogDebug($"[TOUCH] Manipulation starting with {e.Manipulators.Count()} fingers");
             e.Handled = true;
         }
 
@@ -285,8 +514,7 @@ namespace DeskViz.App.Controls
             var totalY = e.CumulativeManipulation.Translation.Y;
             var fingerCount = e.Manipulators.Count();
 
-            System.Diagnostics.Debug.WriteLine($"[TOUCH] Delta: X={deltaX:F1}, Y={deltaY:F1}, Total: X={totalX:F1}, Y={totalY:F1}, Fingers={fingerCount}");
-            Console.WriteLine($"[TOUCH] Delta: X={deltaX:F1}, Y={deltaY:F1}, Total: X={totalX:F1}, Y={totalY:F1}, Fingers={fingerCount}");
+            _logger.LogDebug($"[TOUCH] Delta: X={deltaX:F1}, Y={deltaY:F1}, Total: X={totalX:F1}, Y={totalY:F1}, Fingers={fingerCount}");
 
             // Process horizontal swipes for any finger count (1, 2, 3+)
             if (Math.Abs(totalX) > Math.Abs(totalY) && Math.Abs(totalX) > 5)
@@ -302,8 +530,7 @@ namespace DeskViz.App.Controls
 
                 PageTransform.X = totalX * resistance;
 
-                System.Diagnostics.Debug.WriteLine($"[TOUCH] Horizontal swipe detected: {PageTransform.X:F1}");
-                Console.WriteLine($"[TOUCH] Horizontal swipe detected: {PageTransform.X:F1}");
+                _logger.LogDebug($"[TOUCH] Horizontal swipe detected: {PageTransform.X:F1}");
                 e.Handled = true;
             }
             else if (Math.Abs(totalY) > Math.Abs(totalX) && Math.Abs(totalY) > 30)
@@ -311,8 +538,7 @@ namespace DeskViz.App.Controls
                 // Vertical swipe - could be for page selector from top
                 if (totalY > 50 && e.ManipulationOrigin.Y <= 50)
                 {
-                    System.Diagnostics.Debug.WriteLine("[TOUCH] Vertical swipe from top - showing page selector");
-                    Console.WriteLine("[TOUCH] Vertical swipe from top - showing page selector");
+                    _logger.LogDebug("[TOUCH] Vertical swipe from top - showing page selector");
                     ShowPageSelector();
                     e.Complete();
                 }
@@ -329,46 +555,40 @@ namespace DeskViz.App.Controls
             var totalX = e.TotalManipulation.Translation.X;
             var fingerCount = e.Manipulators.Count();
 
-            System.Diagnostics.Debug.WriteLine($"[TOUCH] Manipulation completed: totalX={totalX:F1}, was manipulating={_isManipulating}, fingers={fingerCount}");
-            Console.WriteLine($"[TOUCH] Manipulation completed: totalX={totalX:F1}, was manipulating={_isManipulating}, fingers={fingerCount}");
+            _logger.LogDebug($"[TOUCH] Manipulation completed: totalX={totalX:F1}, was manipulating={_isManipulating}, fingers={fingerCount}");
 
             if (_isManipulating || Math.Abs(totalX) > 10)
             {
                 // Use a lower threshold for touch gestures (1/4 of container width)
                 var threshold = Math.Max(ActualWidth / 4, 60); // Minimum 60px threshold
 
-                System.Diagnostics.Debug.WriteLine($"[TOUCH] Threshold: {threshold:F1}, totalX: {totalX:F1}");
-                Console.WriteLine($"[TOUCH] Threshold: {threshold:F1}, totalX: {totalX:F1}");
+                _logger.LogDebug($"[TOUCH] Threshold: {threshold:F1}, totalX: {totalX:F1}");
 
                 if (Math.Abs(totalX) > threshold)
                 {
                     if (totalX > 0 && _currentPageIndex > 0)
                     {
                         // Swiped right - go to previous page
-                        System.Diagnostics.Debug.WriteLine($"[TOUCH] Swiping right: page {_currentPageIndex} -> {_currentPageIndex - 1}");
-                        Console.WriteLine($"[TOUCH] Swiping right: page {_currentPageIndex} -> {_currentPageIndex - 1}");
+                        _logger.LogDebug($"[TOUCH] Swiping right: page {_currentPageIndex} -> {_currentPageIndex - 1}");
                         NavigateToPage(_currentPageIndex - 1);
                     }
                     else if (totalX < 0 && _currentPageIndex < _pages.Count - 1)
                     {
                         // Swiped left - go to next page
-                        System.Diagnostics.Debug.WriteLine($"[TOUCH] Swiping left: page {_currentPageIndex} -> {_currentPageIndex + 1}");
-                        Console.WriteLine($"[TOUCH] Swiping left: page {_currentPageIndex} -> {_currentPageIndex + 1}");
+                        _logger.LogDebug($"[TOUCH] Swiping left: page {_currentPageIndex} -> {_currentPageIndex + 1}");
                         NavigateToPage(_currentPageIndex + 1);
                     }
                     else
                     {
                         // At edge, bounce back
-                        System.Diagnostics.Debug.WriteLine($"[TOUCH] At edge, bouncing back");
-                        Console.WriteLine($"[TOUCH] At edge, bouncing back");
+                        _logger.LogDebug($"[TOUCH] At edge, bouncing back");
                         AnimatePageTransform(0);
                     }
                 }
                 else
                 {
                     // Not enough movement, bounce back
-                    System.Diagnostics.Debug.WriteLine($"[TOUCH] Not enough movement, bouncing back");
-                    Console.WriteLine($"[TOUCH] Not enough movement, bouncing back");
+                    _logger.LogDebug($"[TOUCH] Not enough movement, bouncing back");
                     AnimatePageTransform(0);
                 }
 
@@ -391,7 +611,7 @@ namespace DeskViz.App.Controls
         
         private void LeftEdge_Click(object sender, MouseButtonEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("Left edge clicked - navigating to previous page");
+            _logger.LogDebug("Left edge clicked - navigating to previous page");
             if (_currentPageIndex > 0)
             {
                 NavigateToPage(_currentPageIndex - 1);
@@ -401,7 +621,7 @@ namespace DeskViz.App.Controls
         
         private void RightEdge_Click(object sender, MouseButtonEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("Right edge clicked - navigating to next page");
+            _logger.LogDebug("Right edge clicked - navigating to next page");
             if (_currentPageIndex < _pages.Count - 1)
             {
                 NavigateToPage(_currentPageIndex + 1);
@@ -411,7 +631,7 @@ namespace DeskViz.App.Controls
         
         private void TopEdge_Click(object sender, MouseButtonEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("Top edge clicked - showing page selector");
+            _logger.LogDebug("Top edge clicked - showing page selector");
             ShowPageSelector();
             e.Handled = true;
         }
@@ -427,13 +647,11 @@ namespace DeskViz.App.Controls
             _swipeStartTime = DateTime.Now;
             _currentSwipeProgress = 0;
 
-            System.Diagnostics.Debug.WriteLine($"[MOUSE] Button down at {position}");
-            Console.WriteLine($"[MOUSE] Button down at {position}");
+            _logger.LogDebug($"[MOUSE] Button down at {position}");
 
             // Track for swipe down gesture
             _isSwipeTracking = true;
-            System.Diagnostics.Debug.WriteLine($"[MOUSE] Swipe down tracking started at {position}");
-            Console.WriteLine($"[MOUSE] Swipe down tracking started at {position}");
+            _logger.LogDebug($"[MOUSE] Swipe down tracking started at {position}");
 
             // Don't mark as handled initially to allow widget interactions
         }
@@ -446,8 +664,7 @@ namespace DeskViz.App.Controls
                 var deltaY = currentPosition.Y - _swipeStartPoint.Y;
                 var timeElapsed = (DateTime.Now - _swipeStartTime).TotalMilliseconds;
 
-                System.Diagnostics.Debug.WriteLine($"[MOUSE] Mouse move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
-                Console.WriteLine($"[MOUSE] Mouse move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
+                _logger.LogDebug($"[MOUSE] Mouse move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
 
                 // Update swipe progress for visual feedback
                 _currentSwipeProgress = Math.Max(0, deltaY);
@@ -456,8 +673,7 @@ namespace DeskViz.App.Controls
                 // Vertical swipe detection (for page selector)
                 if (deltaY > SwipeThreshold)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[MOUSE] Swipe down detected: {deltaY:F1}px - showing animated page selector");
-                    Console.WriteLine($"[MOUSE] Swipe down detected: {deltaY:F1}px - showing animated page selector");
+                    _logger.LogDebug($"[MOUSE] Swipe down detected: {deltaY:F1}px - showing animated page selector");
                     ShowAnimatedPageSelector();
                     _isSwipeTracking = false;
                     e.Handled = true;
@@ -469,8 +685,7 @@ namespace DeskViz.App.Controls
         {
             if (_isSwipeTracking)
             {
-                System.Diagnostics.Debug.WriteLine($"[MOUSE] Mouse up - PageSelector visible: {PageSelectorOverlay.Visibility}");
-                Console.WriteLine($"[MOUSE] Mouse up - PageSelector visible: {PageSelectorOverlay.Visibility}");
+                _logger.LogDebug($"[MOUSE] Mouse up - PageSelector visible: {PageSelectorOverlay.Visibility}");
 
                 // Reset visual feedback
                 ResetSwipeVisualFeedback();
@@ -496,7 +711,7 @@ namespace DeskViz.App.Controls
         
         private void ShowPageSelector()
         {
-            System.Diagnostics.Debug.WriteLine("Showing page selector overlay");
+            _logger.LogDebug("Showing page selector overlay");
             UpdatePageIndicators(); // Refresh the page list
             PageSelectorOverlay.Visibility = Visibility.Visible;
         }
@@ -506,14 +721,12 @@ namespace DeskViz.App.Controls
         /// </summary>
         private void ShowAnimatedPageSelector()
         {
-            System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Showing animated page selector");
-            Console.WriteLine("[PAGE SELECTOR] Showing animated page selector");
+            _logger.LogDebug("[PAGE SELECTOR] Showing animated page selector");
 
             UpdatePageIndicators(); // Refresh the page list
             _pageSelectorJustOpened = true;
 
-            System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] Container size: {ActualWidth}x{ActualHeight}");
-            Console.WriteLine($"[PAGE SELECTOR] Container size: {ActualWidth}x{ActualHeight}");
+            _logger.LogDebug($"[PAGE SELECTOR] Container size: {ActualWidth}x{ActualHeight}");
 
             // Stop any running animations first
             PageSelectorOverlay.BeginAnimation(UIElement.OpacityProperty, null);
@@ -524,15 +737,13 @@ namespace DeskViz.App.Controls
             PageSelectorOverlay.Opacity = 1.0;
             PageSelectorOverlay.Visibility = Visibility.Visible;
 
-            System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] State before animation - Visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}");
-            Console.WriteLine($"[PAGE SELECTOR] State before animation - Visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}");
+            _logger.LogDebug($"[PAGE SELECTOR] State before animation - Visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}");
 
             // Set initial position (off-screen above)
             var transform = new TranslateTransform(0, -ActualHeight);
             PageSelectorOverlay.RenderTransform = transform;
 
-            System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] Overlay visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}, Transform Y: {transform.Y}");
-            Console.WriteLine($"[PAGE SELECTOR] Overlay visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}, Transform Y: {transform.Y}");
+            _logger.LogDebug($"[PAGE SELECTOR] Overlay visibility: {PageSelectorOverlay.Visibility}, Opacity: {PageSelectorOverlay.Opacity}, Transform Y: {transform.Y}");
 
             // Animate slide down
             var storyboard = new Storyboard();
@@ -563,8 +774,7 @@ namespace DeskViz.App.Controls
             storyboard.Completed += (s, e) =>
             {
                 // Allow closing after animation completes
-                System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Show animation completed, can now close");
-                Console.WriteLine("[PAGE SELECTOR] Show animation completed, can now close");
+                _logger.LogDebug("[PAGE SELECTOR] Show animation completed, can now close");
                 _pageSelectorJustOpened = false;
             };
 
@@ -622,8 +832,7 @@ namespace DeskViz.App.Controls
         {
             if (_currentPageIndex < _pages.Count - 1)
             {
-                System.Diagnostics.Debug.WriteLine($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex + 1}");
-                Console.WriteLine($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex + 1}");
+                _logger.LogDebug($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex + 1}");
                 NavigateToPage(_currentPageIndex + 1);
             }
         }
@@ -635,15 +844,14 @@ namespace DeskViz.App.Controls
         {
             if (_currentPageIndex > 0)
             {
-                System.Diagnostics.Debug.WriteLine($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex - 1}");
-                Console.WriteLine($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex - 1}");
+                _logger.LogDebug($"[TEST] Navigating from page {_currentPageIndex} to {_currentPageIndex - 1}");
                 NavigateToPage(_currentPageIndex - 1);
             }
         }
         
         private void HidePageSelector()
         {
-            System.Diagnostics.Debug.WriteLine("Hiding page selector overlay");
+            _logger.LogDebug("Hiding page selector overlay");
             HideAnimatedPageSelector();
         }
 
@@ -652,8 +860,7 @@ namespace DeskViz.App.Controls
         /// </summary>
         private void HideAnimatedPageSelector()
         {
-            System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Starting hide animation");
-            Console.WriteLine("[PAGE SELECTOR] Starting hide animation");
+            _logger.LogDebug("[PAGE SELECTOR] Starting hide animation");
 
             var transform = PageSelectorOverlay.RenderTransform as TranslateTransform;
             if (transform == null)
@@ -700,8 +907,7 @@ namespace DeskViz.App.Controls
                 // Stop any lingering animations
                 PageSelectorOverlay.BeginAnimation(UIElement.OpacityProperty, null);
 
-                System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Hide animation completed - all state reset");
-                Console.WriteLine("[PAGE SELECTOR] Hide animation completed - all state reset");
+                _logger.LogDebug("[PAGE SELECTOR] Hide animation completed - all state reset");
             };
 
             storyboard.Begin();
@@ -711,14 +917,12 @@ namespace DeskViz.App.Controls
         {
             var timeSinceLastClose = (DateTime.Now - _lastCloseTime).TotalMilliseconds;
 
-            System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] Overlay clicked - Source: {e.Source?.GetType().Name}, JustOpened: {_pageSelectorJustOpened}, TimeSinceLastClose: {timeSinceLastClose}ms");
-            Console.WriteLine($"[PAGE SELECTOR] Overlay clicked - Source: {e.Source?.GetType().Name}, JustOpened: {_pageSelectorJustOpened}, TimeSinceLastClose: {timeSinceLastClose}ms");
+            _logger.LogDebug($"[PAGE SELECTOR] Overlay clicked - Source: {e.Source?.GetType().Name}, JustOpened: {_pageSelectorJustOpened}, TimeSinceLastClose: {timeSinceLastClose}ms");
 
             // Prevent rapid repeated closes (less than 500ms apart)
             if (timeSinceLastClose < 500)
             {
-                System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Ignoring click - too soon after last close");
-                Console.WriteLine("[PAGE SELECTOR] Ignoring click - too soon after last close");
+                _logger.LogDebug("[PAGE SELECTOR] Ignoring click - too soon after last close");
                 e.Handled = true;
                 return;
             }
@@ -726,8 +930,7 @@ namespace DeskViz.App.Controls
             // Don't close immediately after opening
             if (_pageSelectorJustOpened)
             {
-                System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Ignoring click - just opened");
-                Console.WriteLine("[PAGE SELECTOR] Ignoring click - just opened");
+                _logger.LogDebug("[PAGE SELECTOR] Ignoring click - just opened");
                 e.Handled = true;
                 return;
             }
@@ -735,16 +938,14 @@ namespace DeskViz.App.Controls
             // Only hide if clicking the overlay background itself (not content borders)
             if (e.Source == PageSelectorOverlay && e.OriginalSource == PageSelectorOverlay)
             {
-                System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Hiding page selector - clicked true background");
-                Console.WriteLine("[PAGE SELECTOR] Hiding page selector - clicked true background");
+                _logger.LogDebug("[PAGE SELECTOR] Hiding page selector - clicked true background");
                 _lastCloseTime = DateTime.Now;
                 HidePageSelector();
                 e.Handled = true;
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] Not closing - Source: {e.Source?.GetType().Name}, OriginalSource: {e.OriginalSource?.GetType().Name}");
-                Console.WriteLine($"[PAGE SELECTOR] Not closing - Source: {e.Source?.GetType().Name}, OriginalSource: {e.OriginalSource?.GetType().Name}");
+                _logger.LogDebug($"[PAGE SELECTOR] Not closing - Source: {e.Source?.GetType().Name}, OriginalSource: {e.OriginalSource?.GetType().Name}");
                 e.Handled = true;
             }
         }
@@ -753,8 +954,7 @@ namespace DeskViz.App.Controls
         {
             if (sender is FrameworkElement element && element.Tag is int pageIndex)
             {
-                System.Diagnostics.Debug.WriteLine($"[PAGE SELECTOR] Page {pageIndex} selected from overlay");
-                Console.WriteLine($"[PAGE SELECTOR] Page {pageIndex} selected from overlay");
+                _logger.LogDebug($"[PAGE SELECTOR] Page {pageIndex} selected from overlay");
                 NavigateToPage(pageIndex);
                 _lastCloseTime = DateTime.Now;
                 HidePageSelector();
@@ -764,8 +964,7 @@ namespace DeskViz.App.Controls
 
         private void ClosePageSelector_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[PAGE SELECTOR] Close button clicked");
-            Console.WriteLine("[PAGE SELECTOR] Close button clicked");
+            _logger.LogDebug("[PAGE SELECTOR] Close button clicked");
             _lastCloseTime = DateTime.Now;
             HidePageSelector();
         }
@@ -777,8 +976,7 @@ namespace DeskViz.App.Controls
         private void PageContainer_TouchDown(object sender, TouchEventArgs e)
         {
             var position = e.GetTouchPoint(this).Position;
-            System.Diagnostics.Debug.WriteLine($"[TOUCH] Touch down at {position}");
-            Console.WriteLine($"[TOUCH] Touch down at {position}");
+            _logger.LogDebug($"[TOUCH] Touch down at {position}");
 
             _swipeStartPoint = position;
             _swipeStartTime = DateTime.Now;
@@ -796,8 +994,7 @@ namespace DeskViz.App.Controls
                 var deltaY = currentPosition.Y - _swipeStartPoint.Y;
                 var timeElapsed = (DateTime.Now - _swipeStartTime).TotalMilliseconds;
 
-                System.Diagnostics.Debug.WriteLine($"[TOUCH] Touch move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
-                Console.WriteLine($"[TOUCH] Touch move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
+                _logger.LogDebug($"[TOUCH] Touch move: deltaY={deltaY:F1}, time={timeElapsed:F0}ms");
 
                 // Update swipe progress for visual feedback
                 _currentSwipeProgress = Math.Max(0, deltaY);
@@ -806,8 +1003,7 @@ namespace DeskViz.App.Controls
                 // Check for swipe down (page selector)
                 if (deltaY > SwipeThreshold)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[TOUCH] Swipe down detected: {deltaY:F1}px - showing animated page selector");
-                    Console.WriteLine($"[TOUCH] Swipe down detected: {deltaY:F1}px - showing animated page selector");
+                    _logger.LogDebug($"[TOUCH] Swipe down detected: {deltaY:F1}px - showing animated page selector");
                     ShowAnimatedPageSelector();
                     _isSwipeTracking = false;
                     e.Handled = true;
@@ -815,15 +1011,13 @@ namespace DeskViz.App.Controls
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"[TOUCH] Touch move ignored - not tracking (isSwipeTracking: {_isSwipeTracking})");
-                Console.WriteLine($"[TOUCH] Touch move ignored - not tracking (isSwipeTracking: {_isSwipeTracking})");
+                _logger.LogDebug($"[TOUCH] Touch move ignored - not tracking (isSwipeTracking: {_isSwipeTracking})");
             }
         }
 
         private void PageContainer_TouchUp(object sender, TouchEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"[TOUCH] Touch up - PageSelector visible: {PageSelectorOverlay.Visibility}");
-            Console.WriteLine($"[TOUCH] Touch up - PageSelector visible: {PageSelectorOverlay.Visibility}");
+            _logger.LogDebug($"[TOUCH] Touch up - PageSelector visible: {PageSelectorOverlay.Visibility}");
 
             if (_isSwipeTracking)
             {
@@ -842,21 +1036,18 @@ namespace DeskViz.App.Controls
         private void PageContainer_StylusDown(object sender, StylusDownEventArgs e)
         {
             var position = e.GetPosition(this);
-            System.Diagnostics.Debug.WriteLine($"[STYLUS] Stylus down at {position}");
-            Console.WriteLine($"[STYLUS] Stylus down at {position}");
+            _logger.LogDebug($"[STYLUS] Stylus down at {position}");
         }
 
         private void PageContainer_StylusMove(object sender, StylusEventArgs e)
         {
             var position = e.GetPosition(this);
-            System.Diagnostics.Debug.WriteLine($"[STYLUS] Stylus move at {position}");
-            Console.WriteLine($"[STYLUS] Stylus move at {position}");
+            _logger.LogDebug($"[STYLUS] Stylus move at {position}");
         }
 
         private void PageContainer_StylusUp(object sender, StylusEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"[STYLUS] Stylus up");
-            Console.WriteLine($"[STYLUS] Stylus up");
+            _logger.LogDebug($"[STYLUS] Stylus up");
         }
 
         #endregion

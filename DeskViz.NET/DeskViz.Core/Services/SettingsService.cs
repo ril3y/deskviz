@@ -5,22 +5,25 @@ using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using DeskViz.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace DeskViz.Core.Services
 {
     /// <summary>
     /// Service for managing application settings
     /// </summary>
-    public class SettingsService
+    public class SettingsService : ISettingsService
     {
+        private readonly ILogger<SettingsService> _logger;
         private string _settingsFilePath;
         private AppSettings _settings;
-        
+
         /// <summary>
         /// Initializes a new instance of the SettingsService class
         /// </summary>
-        public SettingsService()
+        public SettingsService(ILogger<SettingsService>? logger = null)
         {
+            _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<SettingsService>.Instance;
             // Set settings file path to application data folder
             string appDataFolder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -70,13 +73,22 @@ namespace DeskViz.Core.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading settings: {ex.Message}");
+                _logger.LogError(ex, $"Error loading settings: {ex.Message}");
                 // Use default settings if loading fails
                 _settings = new AppSettings();
             }
             
             // Migrate from old single-page system to multi-page if needed
             MigrateToMultiPageSystem();
+
+            // Enforce max page limit on existing settings
+            if (_settings.Pages.Count > MaxPages)
+            {
+                _settings.Pages.RemoveRange(MaxPages, _settings.Pages.Count - MaxPages);
+                if (_settings.CurrentPageIndex >= _settings.Pages.Count)
+                    _settings.CurrentPageIndex = _settings.Pages.Count - 1;
+                SaveSettings();
+            }
             
             return _settings;
         }
@@ -137,7 +149,7 @@ namespace DeskViz.Core.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving settings: {ex.Message}");
+                _logger.LogError(ex, $"Error saving settings: {ex.Message}");
             }
         }
         
@@ -226,8 +238,13 @@ namespace DeskViz.Core.Services
         /// <summary>
         /// Adds a new page
         /// </summary>
+        public const int MaxPages = 5;
+
         public void AddPage(string pageName)
         {
+            if (_settings.Pages.Count >= MaxPages)
+                return;
+
             var newPage = new PageConfig(pageName);
             _settings.Pages.Add(newPage);
             SaveSettings();
@@ -603,5 +620,31 @@ namespace DeskViz.Core.Services
         /// Gets or sets whether to pause auto-rotation when user interacts with the interface.
         /// </summary>
         public bool PauseOnUserInteraction { get; set; } = true;
+
+        // Update Settings
+        /// <summary>
+        /// Gets or sets whether automatic update checking is enabled.
+        /// </summary>
+        public bool AutoUpdateEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets whether to check for updates on application startup.
+        /// </summary>
+        public bool CheckForUpdatesOnStartup { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the interval in hours between periodic update checks.
+        /// </summary>
+        public int UpdateCheckIntervalHours { get; set; } = 24;
+
+        /// <summary>
+        /// Gets or sets the version tag the user has chosen to skip (e.g. "v1.2.0").
+        /// </summary>
+        public string? SkippedVersion { get; set; } = null;
+
+        /// <summary>
+        /// Gets or sets the timestamp of the last update check (UTC).
+        /// </summary>
+        public DateTime? LastUpdateCheck { get; set; } = null;
     }
 }

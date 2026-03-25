@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Windows;
+using DeskViz.App.Services;
 using DeskViz.Core.Services;
 using DeskViz.Core.Models;
 using ScreenInfo = DeskViz.Core.Services.ScreenInfo; // Alias if needed
@@ -8,10 +9,12 @@ using System.Windows.Controls;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using DeskViz.App.Widgets;
+using DeskViz.Plugins.Interfaces;
 using WpfPanel = System.Windows.Controls.Panel;
 using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace DeskViz.App.Views
 {
@@ -20,26 +23,28 @@ namespace DeskViz.App.Views
     /// </summary>
     public partial class SettingsWindow : Window
     {
-        private readonly SettingsService _settingsService;
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<SettingsWindow>();
+        private readonly ISettingsService _settingsService;
         private readonly ScreenService _screenService;
-        private List<IWidget> _originalWidgets;
+        private List<IWidgetPlugin> _originalWidgets;
         private bool _displayChanged = false;
         private bool _orientationChanged = false;
         private bool _autoRotationChanged = false;
         private bool _pagesChanged = false;
         private int _selectedPageIndex = -1;
+        private bool _isLoadingPageConfig = false;
 
         public event EventHandler? WidgetConfigurationChanged;
 
         // Constructor accepting services
-        public SettingsWindow(ScreenService screenService, SettingsService settingsService, IEnumerable<IWidget> widgets)
+        public SettingsWindow(ScreenService screenService, ISettingsService settingsService, IEnumerable<IWidgetPlugin> widgets)
         {
             InitializeComponent();
             _screenService = screenService;
             _settingsService = settingsService;
             
             // Store the original widgets for undo if canceled
-            _originalWidgets = new List<IWidget>(widgets);
+            _originalWidgets = new List<IWidgetPlugin>(widgets);
 
             LoadDisplays();
             LoadOrientationSetting();
@@ -238,6 +243,8 @@ namespace DeskViz.App.Views
 
         private void PagesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isLoadingPageConfig) return;
+
             if (PagesListBox.SelectedIndex >= 0)
             {
                 _selectedPageIndex = PagesListBox.SelectedIndex;
@@ -247,11 +254,19 @@ namespace DeskViz.App.Views
 
         private void LoadPageConfiguration(int pageIndex)
         {
-            var page = _settingsService.GetPage(pageIndex);
-            if (page != null)
+            _isLoadingPageConfig = true;
+            try
             {
-                PageNameTextBox.Text = page.Name;
-                LoadPageWidgets(page);
+                var page = _settingsService.GetPage(pageIndex);
+                if (page != null)
+                {
+                    PageNameTextBox.Text = page.Name;
+                    LoadPageWidgets(page);
+                }
+            }
+            finally
+            {
+                _isLoadingPageConfig = false;
             }
         }
 
@@ -279,7 +294,7 @@ namespace DeskViz.App.Views
             PageWidgetsListView.ItemsSource = pageWidgets;
 
             // Add a note to help users understand what this page configuration does
-            System.Diagnostics.Debug.WriteLine($"Loaded page widgets for '{page.Name}': {pageWidgets.Count} widgets, {pageWidgets.Count(w => w.IsEnabled)} enabled");
+            _logger.LogDebug($"Loaded page widgets for '{page.Name}': {pageWidgets.Count} widgets, {pageWidgets.Count(w => w.IsEnabled)} enabled");
         }
 
         private string GetWidgetSettingsSummary(PageConfig page, string widgetId)
@@ -304,6 +319,13 @@ namespace DeskViz.App.Views
 
         private void AddPage_Click(object sender, RoutedEventArgs e)
         {
+            if (_settingsService.Settings.Pages.Count >= SettingsService.MaxPages)
+            {
+                System.Windows.MessageBox.Show($"Maximum of {SettingsService.MaxPages} pages allowed.",
+                    "Page Limit", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             var dialog = new InputDialog("Enter page name:", "New Page");
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputValue))
             {
@@ -334,6 +356,8 @@ namespace DeskViz.App.Views
 
         private void PageName_Changed(object sender, TextChangedEventArgs e)
         {
+            if (_isLoadingPageConfig) return;
+
             if (_selectedPageIndex >= 0 && PageNameTextBox.Text.Length > 0)
             {
                 var page = _settingsService.GetPage(_selectedPageIndex);
@@ -341,8 +365,16 @@ namespace DeskViz.App.Views
                 {
                     page.Name = PageNameTextBox.Text;
                     _settingsService.UpdatePage(_selectedPageIndex, page);
-                    LoadPages(); // Refresh the list
-                    PagesListBox.SelectedIndex = _selectedPageIndex; // Maintain selection
+                    _isLoadingPageConfig = true;
+                    try
+                    {
+                        LoadPages(); // Refresh the list
+                        PagesListBox.SelectedIndex = _selectedPageIndex; // Maintain selection
+                    }
+                    finally
+                    {
+                        _isLoadingPageConfig = false;
+                    }
                     _pagesChanged = true;
                 }
             }
@@ -350,6 +382,8 @@ namespace DeskViz.App.Views
 
         private void PageWidgetVisibility_Changed(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingPageConfig) return;
+
             if (_selectedPageIndex >= 0 && sender is System.Windows.Controls.CheckBox checkBox && checkBox.DataContext is PageWidgetItem item)
             {
                 var page = _settingsService.GetPage(_selectedPageIndex);
@@ -375,12 +409,72 @@ namespace DeskViz.App.Views
 
         private void MovePageWidgetUp_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: Implement widget reordering within page
+            if (sender is WpfButton button && button.DataContext is PageWidgetItem widgetItem && _selectedPageIndex >= 0)
+            {
+                var page = _settingsService.GetPage(_selectedPageIndex);
+                if (page == null) return;
+
+                var items = PageWidgetsListView.ItemsSource as List<PageWidgetItem>;
+                if (items == null) return;
+
+                int currentIndex = items.IndexOf(widgetItem);
+                if (currentIndex > 0)
+                {
+                    // Swap in the UI list
+                    var temp = items[currentIndex];
+                    items[currentIndex] = items[currentIndex - 1];
+                    items[currentIndex - 1] = temp;
+
+                    // Update the page's widget order
+                    page.WidgetIds.Clear();
+                    foreach (var item in items.Where(i => i.IsEnabled))
+                    {
+                        page.WidgetIds.Add(item.WidgetId);
+                    }
+
+                    _settingsService.UpdatePage(_selectedPageIndex, page);
+                    _pagesChanged = true;
+
+                    // Refresh the list
+                    PageWidgetsListView.ItemsSource = null;
+                    PageWidgetsListView.ItemsSource = items;
+                }
+            }
         }
 
         private void MovePageWidgetDown_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: Implement widget reordering within page
+            if (sender is WpfButton button && button.DataContext is PageWidgetItem widgetItem && _selectedPageIndex >= 0)
+            {
+                var page = _settingsService.GetPage(_selectedPageIndex);
+                if (page == null) return;
+
+                var items = PageWidgetsListView.ItemsSource as List<PageWidgetItem>;
+                if (items == null) return;
+
+                int currentIndex = items.IndexOf(widgetItem);
+                if (currentIndex >= 0 && currentIndex < items.Count - 1)
+                {
+                    // Swap in the UI list
+                    var temp = items[currentIndex];
+                    items[currentIndex] = items[currentIndex + 1];
+                    items[currentIndex + 1] = temp;
+
+                    // Update the page's widget order
+                    page.WidgetIds.Clear();
+                    foreach (var item in items.Where(i => i.IsEnabled))
+                    {
+                        page.WidgetIds.Add(item.WidgetId);
+                    }
+
+                    _settingsService.UpdatePage(_selectedPageIndex, page);
+                    _pagesChanged = true;
+
+                    // Refresh the list
+                    PageWidgetsListView.ItemsSource = null;
+                    PageWidgetsListView.ItemsSource = items;
+                }
+            }
         }
 
         private void MovePageUp_Click(object sender, RoutedEventArgs e)
@@ -447,7 +541,7 @@ namespace DeskViz.App.Views
             }
         }
 
-        private void OpenPageSpecificWidgetSettings(IWidget widget, PageConfig page)
+        private void OpenPageSpecificWidgetSettings(IWidgetPlugin widget, PageConfig page)
         {
             try
             {
@@ -461,14 +555,14 @@ namespace DeskViz.App.Views
                 // 2. Store settings per-page in the PageConfig
                 // 3. Apply those settings when the page is displayed
 
-                System.Diagnostics.Debug.WriteLine($"Opened settings for widget '{widget.WidgetId}' on page '{page.Name}'");
+                _logger.LogDebug($"Opened settings for widget '{widget.WidgetId}' on page '{page.Name}'");
 
                 // Refresh the widget list to update any settings summary
                 LoadPageWidgets(page);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error opening widget settings: {ex.Message}");
+                _logger.LogError(ex, $"Error opening widget settings: {ex.Message}");
                 System.Windows.MessageBox.Show($"Error opening widget settings: {ex.Message}",
                     "Widget Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
@@ -489,7 +583,7 @@ namespace DeskViz.App.Views
         /// <param name="pageIndex">The index of the page to select</param>
         public void OpenPageSettings(int pageIndex = -1)
         {
-            System.Diagnostics.Debug.WriteLine($"OpenPageSettings called with pageIndex: {pageIndex}, Total pages: {_settingsService.Settings.Pages.Count}");
+            _logger.LogDebug($"OpenPageSettings called with pageIndex: {pageIndex}, Total pages: {_settingsService.Settings.Pages.Count}");
             // Find the TabControl (assuming it's named or we can find it in the visual tree)
             var tabControl = this.FindName("MainTabControl") as System.Windows.Controls.TabControl;
             if (tabControl == null)

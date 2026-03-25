@@ -1,0 +1,151 @@
+<UserControl x:Class="DeskViz.Widgets.Cpu.CpuWidgetSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="500">
+        <StackPanel Margin="16" MinWidth="300">
+            <TextBlock Text="CPU Widget Settings"
+                       FontSize="16"
+                       FontWeight="Bold"
+                       Margin="0,0,0,16"/>
+
+            <!-- Update Interval -->
+            <GroupBox Header="Update Settings" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Update Interval:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+
+                        <Slider Grid.Column="1"
+                                Minimum="0.5"
+                                Maximum="10"
+                                Value="{Binding Settings.UpdateIntervalSeconds}"
+                                TickFrequency="0.5"
+                                IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Settings.UpdateIntervalSeconds, StringFormat={}{0:F1}s}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="40"
+                                   Margin="8,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Display Options -->
+            <GroupBox Header="Display Options" Margin="0,0,0,12">
+                <StackPanel>
+                    <CheckBox Content="Show individual CPU cores"
+                              IsChecked="{Binding Settings.ShowCores}"
+                              Margin="8,8,8,4"/>
+
+                    <CheckBox Content="Show CPU temperature"
+                              IsChecked="{Binding Settings.ShowTemperature}"
+                              Margin="8,4,8,4"/>
+
+                    <CheckBox Content="Show CPU clock speed"
+                              IsChecked="{Binding Settings.ShowClockSpeed}"
+                              Margin="8,4,8,4"/>
+
+                    <CheckBox Content="Show CPU power usage"
+                              IsChecked="{Binding Settings.ShowPowerUsage}"
+                              Margin="8,4,8,8"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Temperature Settings -->
+            <GroupBox Header="Temperature Settings"
+                      Margin="0,0,0,12"
+                      IsEnabled="{Binding Settings.ShowTemperature}">
+                <StackPanel>
+                    <CheckBox Content="Use Fahrenheit (instead of Celsius)"
+                              IsChecked="{Binding Settings.UseFahrenheit}"
+                              Margin="8,8,8,4"/>
+
+                    <Grid Margin="8,4,8,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Font Size:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+
+                        <Slider Grid.Column="1"
+                                Minimum="8"
+                                Maximum="24"
+                                Value="{Binding Settings.TemperatureFontSize}"
+                                TickFrequency="2"
+                                IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Settings.TemperatureFontSize, StringFormat={}{0:F0}pt}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="40"
+                                   Margin="8,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Validation Errors -->
+            <ItemsControl ItemsSource="{Binding ValidationErrors}"
+                          Margin="0,8,0,12"
+                          Visibility="{Binding HasValidationErrors, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="Red"
+                                   FontSize="11"
+                                   Margin="0,2"
+                                   TextWrapping="Wrap"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Action Buttons -->
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="1"
+                        Content="Reset"
+                        Command="{Binding ResetCommand}"
+                        Padding="12,4"
+                        Margin="0,0,8,0"/>
+
+                <Button Grid.Column="2"
+                        Content="Cancel"
+                        Command="{Binding CancelCommand}"
+                        Padding="12,4"
+                        Margin="0,0,8,0"/>
+
+                <Button Grid.Column="3"
+                        Content="Save"
+                        Command="{Binding SaveCommand}"
+                        IsDefault="True"
+                        Padding="12,4"/>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

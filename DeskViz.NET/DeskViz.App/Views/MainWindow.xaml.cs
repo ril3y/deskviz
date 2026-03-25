@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Diagnostics;
+using System.Threading;
+using Microsoft.Extensions.Logging;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.IO;
 using DeskViz.App.Services;
+using DeskViz.Core.Models;
 using DeskViz.Core.Services;
 using DeskViz.Plugins.Services;
 using DeskViz.Plugins.Interfaces;
@@ -20,12 +22,15 @@ namespace DeskViz.App.Views
     /// </summary>
     public partial class MainWindow : Window
     {
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<MainWindow>();
         private readonly ScreenService _screenService;
-        private readonly SettingsService _settingsService;
+        private readonly ISettingsService _settingsService;
         private readonly IHardwareMonitorService _hardwareMonitorService; // Added for DI
+        private readonly IHardwarePollingService _hardwarePollingService; // Centralized hardware polling
         private readonly IMediaControlService _mediaControlService; // Added for media control
         private readonly ISystemTrayService _systemTrayService;
         private readonly AutoRotationService _autoRotationService;
+        private UpdateService? _updateService;
         private List<IWidgetPlugin> _allWidgets = new List<IWidgetPlugin>();
 
         // Plugin system
@@ -37,12 +42,14 @@ namespace DeskViz.App.Views
 
         public MainWindow()
         {
-            Debug.WriteLine("===== MainWindow constructor started =====");
+            _logger.LogDebug("===== MainWindow constructor started =====");
 
             // Initialize services early to satisfy nullable checks, even if InitComponent fails
             _settingsService = new SettingsService();
             _screenService = new ScreenService();
             _hardwareMonitorService = new LibreHardwareMonitorService(); // Create single instance
+            _hardwarePollingService = new HardwarePollingService(_hardwareMonitorService); // Centralized polling
+            _hardwarePollingService.Start(); // Start the polling service
             _mediaControlService = new WindowsMediaControlService(); // Create media control service
             _systemTrayService = new SystemTrayService();
             _autoRotationService = new AutoRotationService(_settingsService);
@@ -50,11 +57,15 @@ namespace DeskViz.App.Views
             // Initialize plugin system
             try
             {
-                Debug.WriteLine("Starting plugin system initialization...");
-                var pluginDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WidgetOutput");
-                Debug.WriteLine($"Plugin directory: {pluginDirectory}");
+                _logger.LogDebug("Starting plugin system initialization...");
+                // Look for WidgetOutput in solution root (five levels up from bin/Debug/tfm/win-x64/), fallback to beside executable
+                var solutionWidgetOutput = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "WidgetOutput"));
+                var pluginDirectory = Directory.Exists(solutionWidgetOutput)
+                    ? solutionWidgetOutput
+                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WidgetOutput");
+                _logger.LogDebug($"Plugin directory: {pluginDirectory}");
 
-                var serviceProvider = new AppWidgetServiceProvider(_hardwareMonitorService, _mediaControlService);
+                var serviceProvider = new AppWidgetServiceProvider(_hardwareMonitorService, _hardwarePollingService, _mediaControlService);
                 _widgetHost = new PluginHost(serviceProvider);
                 _widgetDiscoveryService = new WidgetDiscoveryService(pluginDirectory);
                 _widgetManager = new WidgetManager(_widgetDiscoveryService, _widgetHost);
@@ -64,34 +75,39 @@ namespace DeskViz.App.Views
                 _widgetManager.WidgetDeactivated += OnPluginWidgetDeactivated;
                 _widgetManager.WidgetError += OnPluginWidgetError;
 
-                Debug.WriteLine("Plugin system initialized successfully");
+                _logger.LogDebug("Plugin system initialized successfully");
+
+                // Initialize update service with the same plugin directory
+                _updateService = new UpdateService(_settingsService, pluginDirectory);
+                _updateService.UpdateAvailable += OnUpdateAvailable;
+                _logger.LogDebug("Update service initialized.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error initializing plugin system: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError($"Error initializing plugin system: {ex.Message}");
+                _logger.LogError($"Stack trace: {ex.StackTrace}");
                 // Continue without plugin system
             }
 
             try
             {
-                Debug.WriteLine("Calling InitializeComponent()...");
+                _logger.LogDebug("Calling InitializeComponent()...");
                 InitializeComponent();
-                Debug.WriteLine("InitializeComponent() finished.");
+                _logger.LogDebug("InitializeComponent() finished.");
 
                 // Enable touch support for the main window
                 Stylus.SetIsTouchFeedbackEnabled(this, false);
                 Stylus.SetIsPressAndHoldEnabled(this, false);
                 Stylus.SetIsFlicksEnabled(this, false);
                 Stylus.SetIsTapFeedbackEnabled(this, false);
-                Debug.WriteLine("Touch support configured for MainWindow");
+                _logger.LogDebug("Touch support configured for MainWindow");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("!!!! EXCEPTION DURING InitializeComponent() !!!!");
-                Debug.WriteLine($"Exception: {ex.GetType().Name}");
-                Debug.WriteLine($"Message: {ex.Message}");
-                Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+                _logger.LogError("!!!! EXCEPTION DURING InitializeComponent() !!!!");
+                _logger.LogError($"Exception: {ex.GetType().Name}");
+                _logger.LogError($"Message: {ex.Message}");
+                _logger.LogError($"StackTrace: {ex.StackTrace}");
                 // Consider showing a MessageBox or logging to a file here as well
                 System.Windows.MessageBox.Show($"Fatal error during window initialization: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 // Optionally, rethrow or shutdown
@@ -113,36 +129,36 @@ namespace DeskViz.App.Views
             // Start with window not in taskbar
             ShowInTaskbar = false;
 
-            Debug.WriteLine("MainWindow constructor finished (services initialized).");
+            _logger.LogDebug("MainWindow constructor finished (services initialized).");
         }
 
         private void RegisterWidgets()
         {
-            Debug.WriteLine("RegisterWidgets started");
+            _logger.LogDebug("RegisterWidgets started");
 
             try
             {
                 // Discover plugin widgets first
                 if (_widgetManager != null)
                 {
-                    Debug.WriteLine("Attempting to refresh available widgets...");
+                    _logger.LogDebug("Attempting to refresh available widgets...");
                     _widgetManager.RefreshAvailableWidgets();
-                    Debug.WriteLine($"Discovered {_widgetManager.AvailableWidgets.Count} plugin widgets");
+                    _logger.LogDebug($"Discovered {_widgetManager.AvailableWidgets.Count} plugin widgets");
 
                     // Register discovered plugin widgets first
                     RegisterPluginWidgets();
                 }
                 else
                 {
-                    Debug.WriteLine("Widget manager is null, skipping plugin discovery");
+                    _logger.LogWarning("Widget manager is null, skipping plugin discovery");
                 }
 
                 // Only use plugins now - no more built-in widgets
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in RegisterWidgets: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError($"Error in RegisterWidgets: {ex.Message}");
+                _logger.LogError($"Stack trace: {ex.StackTrace}");
 
                 // No fallback widgets - only plugins
             }
@@ -156,22 +172,22 @@ namespace DeskViz.App.Views
             */
 
             // Debug: Log widget registration
-            System.Diagnostics.Debug.WriteLine($"Registered {_allWidgets.Count} widgets:");
+            _logger.LogDebug($"Registered {_allWidgets.Count} widgets:");
             foreach (var widget in _allWidgets)
             {
-                System.Diagnostics.Debug.WriteLine($"  - {widget.WidgetId}: {widget.GetType().Name}");
+                _logger.LogDebug($"  - {widget.WidgetId}: {widget.GetType().Name}");
             }
-            
+
             // Debug: Log page configuration
-            System.Diagnostics.Debug.WriteLine($"Settings has {_settingsService.Settings.Pages.Count} pages:");
+            _logger.LogDebug($"Settings has {_settingsService.Settings.Pages.Count} pages:");
             for (int i = 0; i < _settingsService.Settings.Pages.Count; i++)
             {
                 var page = _settingsService.Settings.Pages[i];
-                System.Diagnostics.Debug.WriteLine($"  Page {i}: {page.Name} with {page.WidgetIds.Count} widgets");
+                _logger.LogDebug($"  Page {i}: {page.Name} with {page.WidgetIds.Count} widgets");
                 foreach (var widgetId in page.WidgetIds)
                 {
                     var isVisible = page.WidgetVisibility.GetValueOrDefault(widgetId, true);
-                    System.Diagnostics.Debug.WriteLine($"    - {widgetId}: {(isVisible ? "visible" : "hidden")}");
+                    _logger.LogDebug($"    - {widgetId}: {(isVisible ? "visible" : "hidden")}");
                 }
             }
             
@@ -183,7 +199,7 @@ namespace DeskViz.App.Views
 
             // Set the current page (ensure it's within bounds)
             var targetPageIndex = Math.Max(0, Math.Min(_settingsService.Settings.CurrentPageIndex, _settingsService.Settings.Pages.Count - 1));
-            System.Diagnostics.Debug.WriteLine($"Setting current page to: {targetPageIndex} (saved was: {_settingsService.Settings.CurrentPageIndex})");
+            _logger.LogDebug($"Setting current page to: {targetPageIndex} (saved was: {_settingsService.Settings.CurrentPageIndex})");
             PagedContainer.CurrentPageIndex = targetPageIndex;
             
             // Handle page changes
@@ -199,12 +215,12 @@ namespace DeskViz.App.Views
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Debug.WriteLine("Window_Loaded started.");
+            _logger.LogDebug("Window_Loaded started.");
 
             // Check if this is the first run - show display selection dialog
             if (_settingsService.Settings.IsFirstRun)
             {
-                Debug.WriteLine("First run detected - showing display selection dialog.");
+                _logger.LogInformation("First run detected - showing display selection dialog.");
                 ShowFirstRunDisplaySelection();
             }
 
@@ -220,7 +236,18 @@ namespace DeskViz.App.Views
                 ApplyFullscreen();
             }
 
-            Debug.WriteLine("Window_Loaded finished.");
+            // Start periodic update checks and optionally check on startup
+            if (_updateService != null)
+            {
+                _updateService.StartPeriodicChecks();
+
+                if (_settingsService.Settings.CheckForUpdatesOnStartup)
+                {
+                    _ = _updateService.CheckForUpdateAsync();
+                }
+            }
+
+            _logger.LogDebug("Window_Loaded finished.");
         }
 
         /// <summary>
@@ -231,7 +258,7 @@ namespace DeskViz.App.Views
             var screens = _screenService.GetAllScreens();
             if (screens.Count == 0)
             {
-                Debug.WriteLine("No screens detected for first run dialog.");
+                _logger.LogWarning("No screens detected for first run dialog.");
                 _settingsService.MarkFirstRunComplete();
                 return;
             }
@@ -239,7 +266,7 @@ namespace DeskViz.App.Views
             // If only one screen, just save it and skip the dialog
             if (screens.Count == 1)
             {
-                Debug.WriteLine("Only one screen detected - skipping dialog and using it.");
+                _logger.LogDebug("Only one screen detected - skipping dialog and using it.");
                 _settingsService.UpdatePreferredDisplay(screens[0].Identifier);
                 _settingsService.MarkFirstRunComplete();
                 return;
@@ -250,7 +277,7 @@ namespace DeskViz.App.Views
 
             if (dialog.ShowDialog() == true && dialog.SelectedScreen != null)
             {
-                Debug.WriteLine($"User selected display: {dialog.SelectedScreen.DisplayName}");
+                _logger.LogInformation($"User selected display: {dialog.SelectedScreen.DisplayName}");
                 _settingsService.UpdatePreferredDisplay(dialog.SelectedScreen.Identifier);
             }
             else
@@ -259,7 +286,7 @@ namespace DeskViz.App.Views
                 var primaryScreen = _screenService.GetPrimaryScreen();
                 if (primaryScreen != null)
                 {
-                    Debug.WriteLine("No selection made - defaulting to primary screen.");
+                    _logger.LogDebug("No selection made - defaulting to primary screen.");
                     _settingsService.UpdatePreferredDisplay(primaryScreen.Identifier);
                 }
             }
@@ -474,14 +501,14 @@ namespace DeskViz.App.Views
             else if (e.Key == System.Windows.Input.Key.F1)
             {
                 // Debug: Force reload current page
-                System.Diagnostics.Debug.WriteLine("F1 pressed - forcing page reload");
+                _logger.LogDebug("F1 pressed - forcing page reload");
                 PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
                 PagedContainer.CurrentPageIndex = PagedContainer.CurrentPageIndex;
             }
             else if (e.Key == System.Windows.Input.Key.F2)
             {
                 // Debug: Simulate 2-finger swipe left (next page)
-                System.Diagnostics.Debug.WriteLine("F2 pressed - simulating 2-finger swipe left");
+                _logger.LogDebug("F2 pressed - simulating 2-finger swipe left");
                 if (PagedContainer.CurrentPageIndex < _settingsService.Settings.Pages.Count - 1)
                 {
                     PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex + 1);
@@ -490,7 +517,7 @@ namespace DeskViz.App.Views
             else if (e.Key == System.Windows.Input.Key.F3)
             {
                 // Debug: Simulate 2-finger swipe right (previous page)
-                System.Diagnostics.Debug.WriteLine("F3 pressed - simulating 2-finger swipe right");
+                _logger.LogDebug("F3 pressed - simulating 2-finger swipe right");
                 if (PagedContainer.CurrentPageIndex > 0)
                 {
                     PagedContainer.NavigateToPage(PagedContainer.CurrentPageIndex - 1);
@@ -499,7 +526,7 @@ namespace DeskViz.App.Views
             else if (e.Key == System.Windows.Input.Key.F4)
             {
                 // Debug: Test swipe-down page selector
-                System.Diagnostics.Debug.WriteLine("F4 pressed - testing page selector overlay");
+                _logger.LogDebug("F4 pressed - testing page selector overlay");
                 // Add a method to access the page selector from MainWindow
                 TestPageSelector();
             }
@@ -512,7 +539,7 @@ namespace DeskViz.App.Views
 
         private void ContextMenuPageSettings_Click(object sender, RoutedEventArgs e)
         {
-            Debug.WriteLine($"ContextMenuPageSettings_Click called - Current page: {PagedContainer.CurrentPageIndex}");
+            _logger.LogDebug($"ContextMenuPageSettings_Click called - Current page: {PagedContainer.CurrentPageIndex}");
             OpenSettingsWindow(openPageSettings: true);
         }
 
@@ -551,11 +578,11 @@ namespace DeskViz.App.Views
         {
             if (_allWidgets == null || _settingsService == null)
             {
-                System.Diagnostics.Debug.WriteLine("EnsureAllWidgetsInPages: _allWidgets or _settingsService is null");
+                _logger.LogWarning("EnsureAllWidgetsInPages: _allWidgets or _settingsService is null");
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine($"EnsureAllWidgetsInPages: Found {_allWidgets.Count} total widgets");
+            _logger.LogDebug($"EnsureAllWidgetsInPages: Found {_allWidgets.Count} total widgets");
 
             // Get all widget IDs that are in pages
             var widgetsInPages = new HashSet<string>();
@@ -574,7 +601,7 @@ namespace DeskViz.App.Views
 
             if (missingWidgets.Any())
             {
-                System.Diagnostics.Debug.WriteLine($"Found {missingWidgets.Count} missing widgets, adding to first page:");
+                _logger.LogDebug($"Found {missingWidgets.Count} missing widgets, adding to first page:");
 
                 // Add missing widgets to the first page
                 var firstPage = _settingsService.Settings.Pages.FirstOrDefault();
@@ -582,7 +609,7 @@ namespace DeskViz.App.Views
                 {
                     foreach (var widget in missingWidgets)
                     {
-                        System.Diagnostics.Debug.WriteLine($"  Adding {widget.WidgetId} to page '{firstPage.Name}'");
+                        _logger.LogDebug($"  Adding {widget.WidgetId} to page '{firstPage.Name}'");
                         firstPage.WidgetIds.Add(widget.WidgetId);
                         firstPage.WidgetVisibility[widget.WidgetId] = true; // Default to visible
                     }
@@ -617,7 +644,7 @@ namespace DeskViz.App.Views
                 _autoRotationService.Start();
             }
 
-            Debug.WriteLine($"Auto-rotation initialized. Enabled: {_settingsService.Settings.AutoRotationEnabled}");
+            _logger.LogInformation($"Auto-rotation initialized. Enabled: {_settingsService.Settings.AutoRotationEnabled}");
         }
 
         private void OnAutoRotationRequested(object? sender, PageRotationEventArgs e)
@@ -627,7 +654,7 @@ namespace DeskViz.App.Views
             {
                 try
                 {
-                    Debug.WriteLine($"Auto-rotation: switching from page {e.CurrentPageIndex} to {e.NextPageIndex} (mode: {e.RotationMode})");
+                    _logger.LogDebug($"Auto-rotation: switching from page {e.CurrentPageIndex} to {e.NextPageIndex} (mode: {e.RotationMode})");
 
                     // Update settings service current page
                     _settingsService.SetCurrentPageIndex(e.NextPageIndex);
@@ -640,14 +667,14 @@ namespace DeskViz.App.Views
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Error during auto-rotation: {ex.Message}");
+                    _logger.LogError($"Error during auto-rotation: {ex.Message}");
                 }
             });
         }
 
         private void OnAutoRotationStateChanged(object? sender, bool isEnabled)
         {
-            Debug.WriteLine($"Auto-rotation state changed: {(isEnabled ? "Started" : "Stopped")}");
+            _logger.LogInformation($"Auto-rotation state changed: {(isEnabled ? "Started" : "Stopped")}");
         }
 
         public void OnUserInteraction()
@@ -667,17 +694,17 @@ namespace DeskViz.App.Views
                 if (_settingsService.Settings.AutoRotationEnabled)
                 {
                     _autoRotationService?.Start();
-                    Debug.WriteLine("Auto-rotation started after settings update");
+                    _logger.LogDebug("Auto-rotation started after settings update");
                 }
                 else
                 {
                     _autoRotationService?.Stop();
-                    Debug.WriteLine("Auto-rotation stopped after settings update");
+                    _logger.LogDebug("Auto-rotation stopped after settings update");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error refreshing auto-rotation settings: {ex.Message}");
+                _logger.LogError($"Error refreshing auto-rotation settings: {ex.Message}");
             }
         }
 
@@ -698,12 +725,12 @@ namespace DeskViz.App.Views
         /// </summary>
         private void OpenSettingsWindow(bool openPageSettings = false) // Add optional parameter
         {
-            Debug.WriteLine($"OpenSettingsWindow called - openPageSettings: {openPageSettings}, CurrentPage: {PagedContainer.CurrentPageIndex}"); // Enhanced log message
+            _logger.LogDebug($"OpenSettingsWindow called - openPageSettings: {openPageSettings}, CurrentPage: {PagedContainer.CurrentPageIndex}");
             // Check if an instance already exists to prevent duplicates (optional, depends on desired behavior)
             var existingSettingsWindow = System.Windows.Application.Current.Windows.OfType<SettingsWindow>().FirstOrDefault();
             if (existingSettingsWindow != null)
             {
-                Debug.WriteLine("SettingsWindow already open. Activating it.");
+                _logger.LogDebug("SettingsWindow already open. Activating it.");
                 if (existingSettingsWindow.WindowState == WindowState.Minimized) {
                     existingSettingsWindow.WindowState = WindowState.Normal; // Restore if minimized
                 }
@@ -713,14 +740,14 @@ namespace DeskViz.App.Views
             }
             else
             {
-                Debug.WriteLine("Creating new SettingsWindow instance.");
+                _logger.LogDebug("Creating new SettingsWindow instance.");
                 // Pass both required services to the constructor - Revert to 3 arguments
                 var settingsWindow = new SettingsWindow(_screenService, _settingsService, _allWidgets);
 
                 // Subscribe to widget configuration changes for real-time updates
                 settingsWindow.WidgetConfigurationChanged += (s, args) =>
                 {
-                    Debug.WriteLine("Widget configuration changed. Refreshing page display.");
+                    _logger.LogDebug("Widget configuration changed. Refreshing page display.");
                     RefreshCurrentPageDisplay();
                 };
 
@@ -732,7 +759,7 @@ namespace DeskViz.App.Views
                 settingsWindow.Owner = this; // Set the owner to the MainWindow
                 settingsWindow.Closed += (s, args) =>
                 {
-                    Debug.WriteLine("SettingsWindow closed.");
+                    _logger.LogDebug("SettingsWindow closed.");
                     // Refresh auto-rotation settings when settings window closes
                     RefreshAutoRotationSettings();
                     // Also refresh the page display in case there were changes
@@ -757,7 +784,7 @@ namespace DeskViz.App.Views
                 if (System.IO.File.Exists(iconPath))
                 {
                     icon = new System.Drawing.Icon(iconPath);
-                    Debug.WriteLine($"Loaded icon from file: {iconPath}");
+                    _logger.LogDebug($"Loaded icon from file: {iconPath}");
                 }
                 else
                 {
@@ -767,7 +794,7 @@ namespace DeskViz.App.Views
                     if (iconStream != null)
                     {
                         icon = new System.Drawing.Icon(iconStream.Stream);
-                        Debug.WriteLine("Loaded icon from embedded resource");
+                        _logger.LogDebug("Loaded icon from embedded resource");
                     }
                 }
                 
@@ -778,22 +805,23 @@ namespace DeskViz.App.Views
                     // Subscribe to events
                     _systemTrayService.SettingsRequested += SystemTray_SettingsRequested;
                     _systemTrayService.AboutRequested += SystemTray_AboutRequested;
+                    _systemTrayService.CheckForUpdatesRequested += SystemTray_CheckForUpdatesRequested;
                     _systemTrayService.ExitRequested += SystemTray_ExitRequested;
                     _systemTrayService.TrayIconDoubleClicked += SystemTray_DoubleClicked;
                     
                     // Show the tray icon
                     _systemTrayService.Show();
-                    Debug.WriteLine("System tray initialized successfully");
+                    _logger.LogDebug("System tray initialized successfully");
                 }
                 else
                 {
-                    Debug.WriteLine("Failed to load system tray icon from any source");
+                    _logger.LogWarning("Failed to load system tray icon from any source");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error initializing system tray: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError($"Error initializing system tray: {ex.Message}");
+                _logger.LogError($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -894,8 +922,110 @@ namespace DeskViz.App.Views
             }
         }
 
+        private void SystemTray_CheckForUpdatesRequested(object? sender, EventArgs e)
+        {
+            Dispatcher.Invoke(async () =>
+            {
+                if (_updateService == null) return;
+
+                _systemTrayService?.ShowBalloonTip("DeskViz", "Checking for updates...", 2000);
+
+                var release = await _updateService.CheckForUpdateAsync();
+                if (release == null)
+                {
+                    _systemTrayService?.ShowBalloonTip("DeskViz", "You are running the latest version.", 3000);
+                }
+                // If an update is found, OnUpdateAvailable will handle it
+            });
+        }
+
+        private void OnUpdateAvailable(object? sender, UpdateAvailableEventArgs e)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                ShowUpdateDialog(e.Release);
+            });
+        }
+
+        private async void ShowUpdateDialog(ReleaseInfo release)
+        {
+            if (_updateService == null) return;
+
+            try
+            {
+                var dialog = new UpdateDialog(release, _updateService)
+                {
+                    Owner = this
+                };
+
+                var result = dialog.ShowDialog();
+
+                switch (dialog.ChosenAction)
+                {
+                    case UpdateAction.UpdateNow:
+                        await PerformUpdateAsync(release, dialog.IncludeAppUpdate, dialog.IncludeWidgetUpdate);
+                        break;
+
+                    case UpdateAction.SkipVersion:
+                        _settingsService.Settings.SkippedVersion = release.TagName;
+                        _settingsService.SaveSettings();
+                        _logger.LogInformation($"User chose to skip version {release.TagName}.");
+                        break;
+
+                    case UpdateAction.RemindLater:
+                        _logger.LogInformation("User chose to be reminded later about the update.");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error showing update dialog: {ex.Message}");
+            }
+        }
+
+        private async Task PerformUpdateAsync(ReleaseInfo release, bool includeApp, bool includeWidgets)
+        {
+            if (_updateService == null) return;
+
+            try
+            {
+                // Apply widget update first (does not require restart)
+                if (includeWidgets && release.HasWidgetUpdate)
+                {
+                    _logger.LogInformation("Downloading widget update...");
+                    var extractedDir = await _updateService.DownloadWidgetUpdateAsync(release);
+                    if (extractedDir != null)
+                    {
+                        await _updateService.ApplyWidgetUpdateAsync(extractedDir);
+                        _systemTrayService?.ShowBalloonTip("DeskViz", "Widget update applied. Restart to load new widgets.", 3000);
+                    }
+                }
+
+                // Apply app update last (triggers restart)
+                if (includeApp && release.HasAppUpdate)
+                {
+                    _logger.LogInformation("Downloading application update...");
+                    var downloadedPath = await _updateService.DownloadAppUpdateAsync(release);
+                    if (downloadedPath != null)
+                    {
+                        _updateService.ApplyAppUpdate(downloadedPath, () =>
+                        {
+                            Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error performing update: {ex.Message}");
+                System.Windows.MessageBox.Show($"Update failed: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
+            // Clean up update service
+            _updateService?.Dispose();
             // Clean up system tray on close
             _systemTrayService?.Dispose();
             base.OnClosed(e);
@@ -909,28 +1039,26 @@ namespace DeskViz.App.Views
             try
             {
                 var currentPageIndex = PagedContainer.CurrentPageIndex;
-                Debug.WriteLine($"Refreshing page display for page {currentPageIndex}");
+                _logger.LogDebug($"Refreshing page display for page {currentPageIndex}");
 
-                // Only initialize if not already initialized, otherwise just add new widgets
+                // Only initialize if not already initialized, otherwise sync pages and add new widgets
                 if (!PagedContainer.IsContainerInitialized)
                 {
-                    Debug.WriteLine("Initializing PagedContainer for the first time");
+                    _logger.LogDebug("Initializing PagedContainer for the first time");
                     PagedContainer.Initialize(_settingsService.Settings.Pages, _allWidgets);
                 }
                 else
                 {
-                    Debug.WriteLine("Adding new widgets to existing container");
+                    _logger.LogDebug("Syncing pages and widgets with existing container");
+                    PagedContainer.SyncPages(_settingsService.Settings.Pages);
                     PagedContainer.AddNewWidgets(_allWidgets);
                 }
 
-                // Restore the current page index
-                PagedContainer.CurrentPageIndex = currentPageIndex;
-
-                Debug.WriteLine($"Page display refreshed successfully");
+                _logger.LogDebug($"Page display refreshed successfully");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error refreshing page display: {ex.Message}");
+                _logger.LogError($"Error refreshing page display: {ex.Message}");
             }
         }
 
@@ -943,55 +1071,55 @@ namespace DeskViz.App.Views
 
         private void RegisterPluginWidgets()
         {
-            Console.WriteLine("🔥 ATTEMPTING TO LOAD PLUGIN WIDGETS FROM DLLs");
+            _logger.LogDebug("Attempting to load plugin widgets from DLLs");
 
             if (_widgetManager == null)
             {
-                Console.WriteLine("❌ Widget manager is null - plugin system failed to initialize");
+                _logger.LogWarning("Widget manager is null - plugin system failed to initialize");
                 return;
             }
 
-            Console.WriteLine($"🔍 Found {_widgetManager.AvailableWidgets.Count} plugin widgets");
+            _logger.LogDebug($"Found {_widgetManager.AvailableWidgets.Count} plugin widgets");
 
             // Activate discovered plugin widgets
             foreach (var loadedWidget in _widgetManager.AvailableWidgets)
             {
                 try
                 {
-                    Console.WriteLine($"🔥 LOADING PLUGIN: {loadedWidget.Metadata.Id} ({loadedWidget.Metadata.Name})");
+                    _logger.LogDebug($"Loading plugin: {loadedWidget.Metadata.Id} ({loadedWidget.Metadata.Name})");
 
                     // Check if we already have a built-in widget with the same ID
                     var existingWidget = _allWidgets.FirstOrDefault(w => w.WidgetId == loadedWidget.Metadata.Id);
                     if (existingWidget != null)
                     {
-                        Console.WriteLine($"🔄 Replacing built-in widget '{loadedWidget.Metadata.Id}' with plugin version");
+                        _logger.LogInformation($"Replacing built-in widget '{loadedWidget.Metadata.Id}' with plugin version");
                         _allWidgets.Remove(existingWidget);
                     }
 
                     // Activate the plugin widget
                     if (_widgetManager.ActivateWidget(loadedWidget.Metadata.Id))
                     {
-                        Console.WriteLine($"✅ SUCCESS: Activated plugin widget: {loadedWidget.Metadata.Id}");
+                        _logger.LogInformation($"Activated plugin widget: {loadedWidget.Metadata.Id}");
                     }
                     else
                     {
-                        Console.WriteLine($"❌ FAILED: Could not activate plugin widget: {loadedWidget.Metadata.Id}");
+                        _logger.LogWarning($"Could not activate plugin widget: {loadedWidget.Metadata.Id}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ ERROR: Failed to register plugin widget '{loadedWidget.Metadata.Id}': {ex.Message}");
+                    _logger.LogError($"Failed to register plugin widget '{loadedWidget.Metadata.Id}': {ex.Message}");
                 }
             }
 
-            Console.WriteLine($"🔥 PLUGIN LOADING COMPLETE");
+            _logger.LogDebug("Plugin loading complete");
         }
 
         private void OnPluginWidgetActivated(object? sender, WidgetActivatedEventArgs e)
         {
             try
             {
-                Debug.WriteLine($"Plugin widget activated: {e.Widget.WidgetId}");
+                _logger.LogInformation($"Plugin widget activated: {e.Widget.WidgetId}");
 
                 // Initialize the plugin widget with host
                 e.Widget.Initialize(_widgetHost!);
@@ -1010,7 +1138,7 @@ namespace DeskViz.App.Views
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error handling plugin widget activation: {ex.Message}");
+                _logger.LogError($"Error handling plugin widget activation: {ex.Message}");
             }
         }
 
@@ -1018,7 +1146,7 @@ namespace DeskViz.App.Views
         {
             try
             {
-                Debug.WriteLine($"Plugin widget deactivated: {e.WidgetId}");
+                _logger.LogInformation($"Plugin widget deactivated: {e.WidgetId}");
 
                 // Remove the plugin widget from the widgets list
                 var widget = _allWidgets.FirstOrDefault(w => w.WidgetId == e.WidgetId);
@@ -1031,13 +1159,13 @@ namespace DeskViz.App.Views
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error handling plugin widget deactivation: {ex.Message}");
+                _logger.LogError($"Error handling plugin widget deactivation: {ex.Message}");
             }
         }
 
         private void OnPluginWidgetError(object? sender, WidgetErrorEventArgs e)
         {
-            Debug.WriteLine($"Plugin widget error in '{e.WidgetId}': {e.Exception.Message}");
+            _logger.LogError($"Plugin widget error in '{e.WidgetId}': {e.Exception.Message}");
             // Could show a notification or error dialog here
         }
 

@@ -3,11 +3,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
+using DeskViz.App.Services;
 using DeskViz.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace DeskViz.App.Widgets
 {
@@ -16,10 +18,10 @@ namespace DeskViz.App.Widgets
     /// </summary>
     public partial class HardDriveWidget : System.Windows.Controls.UserControl, IWidget, INotifyPropertyChanged
     {
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<HardDriveWidget>();
         private readonly IHardwareMonitorService _hardwareMonitorService;
-        private DispatcherTimer? _updateTimer;
+        private readonly IHardwarePollingService _hardwarePollingService;
         private ObservableCollection<DriveInfo> _drives = new ObservableCollection<DriveInfo>();
-        private double _updateIntervalSeconds = 3.0;
         private bool _isConfiguring = false;
         private bool _isWidgetVisible = true;
         private ICommand? _configureWidgetCommand;
@@ -29,7 +31,7 @@ namespace DeskViz.App.Widgets
         private bool _showLabel = true;
         private HashSet<string> _selectedDrives = new HashSet<string>(); // Which drives to show
 
-        private SettingsService? _settingsService;
+        private ISettingsService? _settingsService;
 
         /// <summary>
         /// Gets the unique widget identifier
@@ -97,24 +99,6 @@ namespace DeskViz.App.Widgets
         /// Gets the drive information collection
         /// </summary>
         public ObservableCollection<DriveInfo> Drives => _drives;
-
-        /// <summary>
-        /// Gets or sets the update interval in seconds
-        /// </summary>
-        public double UpdateIntervalSeconds
-        {
-            get => _updateIntervalSeconds;
-            set
-            {
-                if (_updateIntervalSeconds != value)
-                {
-                    _updateIntervalSeconds = value;
-                    OnPropertyChanged();
-                    RestartTimer();
-                    SaveSettings();
-                }
-            }
-        }
 
         /// <summary>
         /// Gets or sets whether to show drive temperatures
@@ -190,23 +174,24 @@ namespace DeskViz.App.Widgets
         /// <summary>
         /// Initializes a new instance of the HardDriveWidget class
         /// </summary>
-        public HardDriveWidget(IHardwareMonitorService hardwareMonitorService, SettingsService? settingsService = null)
+        public HardDriveWidget(IHardwareMonitorService hardwareMonitorService, IHardwarePollingService hardwarePollingService, ISettingsService? settingsService = null)
         {
             InitializeComponent();
             DataContext = this;
 
             _hardwareMonitorService = hardwareMonitorService ?? throw new ArgumentNullException(nameof(hardwareMonitorService));
+            _hardwarePollingService = hardwarePollingService ?? throw new ArgumentNullException(nameof(hardwarePollingService));
 
             if (settingsService != null)
             {
                 LoadSettings(settingsService);
             }
 
-            // Initialize timer for drive updates
-            _updateTimer = new DispatcherTimer();
-            _updateTimer.Interval = TimeSpan.FromSeconds(_updateIntervalSeconds);
-            _updateTimer.Tick += UpdateDriveData;
-            _updateTimer.Start();
+            // Subscribe to centralized hardware polling service
+            _hardwarePollingService.DataUpdated += OnHardwareDataUpdated;
+
+            // Unsubscribe when widget is unloaded
+            this.Unloaded += HardDriveWidget_Unloaded;
 
             // Get initial drive data
             RefreshData();
@@ -215,12 +200,11 @@ namespace DeskViz.App.Widgets
         /// <summary>
         /// Loads widget settings from the settings service
         /// </summary>
-        private void LoadSettings(SettingsService settingsService)
+        private void LoadSettings(ISettingsService settingsService)
         {
             // For now, use default settings - can be extended later
             // ShowTemperature = settings.HardDriveShowTemperature;
             // ShowLabel = settings.HardDriveShowLabel;
-            // UpdateIntervalSeconds = settings.HardDriveUpdateIntervalSeconds;
 
             _settingsService = settingsService;
         }
@@ -236,28 +220,36 @@ namespace DeskViz.App.Widgets
             //     var settings = _settingsService.Settings;
             //     settings.HardDriveShowTemperature = ShowTemperature;
             //     settings.HardDriveShowLabel = ShowLabel;
-            //     settings.HardDriveUpdateIntervalSeconds = UpdateIntervalSeconds;
             //     _settingsService.SaveSettings();
             // }
         }
 
         /// <summary>
-        /// Handles the Tick event of the update timer
+        /// Handles the DataUpdated event from the centralized hardware polling service
         /// </summary>
-        private void UpdateDriveData(object? sender, EventArgs e)
+        private async void OnHardwareDataUpdated(object? sender, EventArgs e)
         {
-            RefreshData();
+            await RefreshDataAsync();
         }
 
         /// <summary>
-        /// Refreshes the widget data
+        /// Handles the Unloaded event to clean up subscriptions
         /// </summary>
-        public void RefreshData()
+        private void HardDriveWidget_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _hardwarePollingService.DataUpdated -= OnHardwareDataUpdated;
+        }
+
+        /// <summary>
+        /// Refreshes the widget data asynchronously to avoid blocking the UI.
+        /// Note: This reads cached values from the hardware monitor service.
+        /// The centralized HardwarePollingService handles calling UpdateAsync().
+        /// </summary>
+        public async Task RefreshDataAsync()
         {
             try
             {
-                _hardwareMonitorService.Update();
-
+                // Read cached values - centralized polling service handles UpdateAsync()
                 var driveInfos = _hardwareMonitorService.GetDriveInfo();
 
                 // Filter drives based on selection (if any drives are selected, only show those)
@@ -318,8 +310,17 @@ namespace DeskViz.App.Widgets
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing hard drive data: {ex.Message}");
+                _logger.LogError(ex, $"Error refreshing hard drive data: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Refreshes the widget data (synchronous version for interface compatibility)
+        /// </summary>
+        public void RefreshData()
+        {
+            // Fire and forget for backwards compatibility
+            _ = RefreshDataAsync();
         }
 
         /// <summary>
@@ -341,19 +342,6 @@ namespace DeskViz.App.Widgets
             foreach (var drive in _drives)
             {
                 drive.ShowLabel = _showLabel;
-            }
-        }
-
-        /// <summary>
-        /// Restarts the update timer with the current interval
-        /// </summary>
-        private void RestartTimer()
-        {
-            if (_updateTimer != null)
-            {
-                _updateTimer.Stop();
-                _updateTimer.Interval = TimeSpan.FromSeconds(_updateIntervalSeconds);
-                _updateTimer.Start();
             }
         }
 
@@ -396,7 +384,7 @@ namespace DeskViz.App.Widgets
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error getting available drives: {ex.Message}");
+                _logger.LogError(ex, $"Error getting available drives: {ex.Message}");
                 return new List<(string Name, string Label)>();
             }
         }

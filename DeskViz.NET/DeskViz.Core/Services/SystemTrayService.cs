@@ -10,7 +10,8 @@ namespace DeskViz.Core.Services
         event EventHandler? AboutRequested;
         event EventHandler? ExitRequested;
         event EventHandler? TrayIconDoubleClicked;
-        
+        event EventHandler? CheckForUpdatesRequested;
+
         void Initialize(Icon icon, string toolTipText);
         void Show();
         void Hide();
@@ -26,6 +27,7 @@ namespace DeskViz.Core.Services
         public event EventHandler? AboutRequested;
         public event EventHandler? ExitRequested;
         public event EventHandler? TrayIconDoubleClicked;
+        public event EventHandler? CheckForUpdatesRequested;
 
         public void Initialize(Icon icon, string toolTipText)
         {
@@ -48,14 +50,18 @@ namespace DeskViz.Core.Services
             settingsItem.Click += (s, e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
             settingsItem.Font = new Font(settingsItem.Font, FontStyle.Bold);
             
+            var checkForUpdatesItem = new ToolStripMenuItem("Check for Updates");
+            checkForUpdatesItem.Click += (s, e) => CheckForUpdatesRequested?.Invoke(this, EventArgs.Empty);
+
             var aboutItem = new ToolStripMenuItem("About");
             aboutItem.Click += (s, e) => AboutRequested?.Invoke(this, EventArgs.Empty);
-            
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += (s, e) => ExitRequested?.Invoke(this, EventArgs.Empty);
-            
+
             _contextMenu.Items.Add(settingsItem);
             _contextMenu.Items.Add(new ToolStripSeparator());
+            _contextMenu.Items.Add(checkForUpdatesItem);
             _contextMenu.Items.Add(aboutItem);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(exitItem);

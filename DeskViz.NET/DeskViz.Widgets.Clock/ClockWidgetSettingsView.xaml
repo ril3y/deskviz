@@ -1,0 +1,62 @@
+<UserControl x:Class="DeskViz.Widgets.Clock.ClockWidgetSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:DeskViz.Widgets.Clock"
+             mc:Ignorable="d"
+             d:DesignHeight="200" d:DesignWidth="400">
+    <UserControl.Resources>
+        <local:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </UserControl.Resources>
+    <StackPanel Margin="10">
+        <GroupBox Header="Time Format" Margin="0,0,0,10">
+            <StackPanel Margin="10">
+                <RadioButton Content="24-hour format (HH:mm:ss)"
+                           IsChecked="{Binding Is24HourFormat}"
+                           Margin="0,0,0,5"/>
+                <RadioButton Content="12-hour format (hh:mm:ss AM/PM)"
+                           IsChecked="{Binding Is24HourFormat, Converter={StaticResource InverseBooleanConverter}}"
+                           Margin="0,0,0,5"/>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Font Settings" Margin="0,0,0,10">
+            <StackPanel Margin="10">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                    <TextBlock Text="Font Size:" VerticalAlignment="Center" Width="80"/>
+                    <Slider x:Name="FontSizeSlider"
+                          Value="{Binding ClockFontSize}"
+                          Minimum="8" Maximum="72"
+                          Width="200"
+                          TickFrequency="4"
+                          IsSnapToTickEnabled="True"
+                          VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ClockFontSize, StringFormat='{}{0:F0}'}"
+                             VerticalAlignment="Center"
+                             Margin="10,0,0,0"
+                             Width="30"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Update Settings" Margin="0,0,0,10">
+            <StackPanel Margin="10">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                    <TextBlock Text="Update Interval:" VerticalAlignment="Center" Width="100"/>
+                    <Slider x:Name="UpdateIntervalSlider"
+                          Value="{Binding UpdateIntervalSeconds}"
+                          Minimum="0.1" Maximum="5"
+                          Width="200"
+                          TickFrequency="0.1"
+                          IsSnapToTickEnabled="True"
+                          VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding UpdateIntervalSeconds, StringFormat='{}{0:F1}s'}"
+                             VerticalAlignment="Center"
+                             Margin="10,0,0,0"
+                             Width="40"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+    </StackPanel>
+</UserControl>

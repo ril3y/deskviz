@@ -32,25 +32,57 @@
 - [x] Implement RAM usage widget
 - [x] Implement GPU usage widget with multi-GPU selection
 - [ ] Implement Disk usage widget
-- [ ] Implement Media Control widget (Windows media integration)
+- [x] Implement Media Control widget (Windows media integration)
 - [ ] Create orientation-aware layouts (portrait/landscape)
 - [x] Add settings UI for display and widget configuration
 
-## Phase 3: Widget Plugin Architecture
-- [ ] Create a plugin system for widget loading
-- [ ] Design an interface for widget plugins
-- [ ] Implement MEF (Managed Extensibility Framework) for dynamic plugin loading
-- [ ] Set up a discovery system for widgets in a plugins directory
-- [ ] Create a widget registration mechanism
-- [ ] Implement versioning for widget plugins
-- [ ] Add metadata support for widget discovery
-- [ ] Create a basic widget plugin template project
-- [ ] Add a widget manager to handle loading/unloading plugins
-- [ ] Implement isolation between widget plugins
+## Phase 3: Multi-Page Widget System
+- [x] Implement swipeable multi-page interface
+  - [x] Create PagedWidgetContainer control with swipe gesture support
+  - [x] Add touch/mouse swipe detection (left/right for pages)
+  - [x] Implement page indicators (dots at bottom)
+  - [x] Add smooth page transition animations
+  - [x] Support keyboard navigation (arrow keys, Page Up/Down)
+- [x] Extend settings system for multi-page configuration
+  - [x] Add "Pages" section to settings window
+  - [x] Implement add/remove/rename page functionality
+  - [x] Create page-specific widget lists
+  - [x] Add "Move to Page" option in widget context menus
+  - [x] Save/load page configurations
+- [x] Update widget management
+  - [x] Track widgets per page instead of globally
+  - [x] Maintain separate widget order for each page
+  - [ ] Support duplicating widgets across pages
+  - [ ] Add page preview in settings
+- [x] Navigation enhancements
+  - [x] Optional: Add swipe from top for quick page selector
+  - [x] System tray menu to jump to specific pages
+  - [x] Configurable auto-rotate through pages
 
-## Phase 4: Advanced Features
+## Phase 4: Widget Plugin Architecture (Hybrid Approach)
+- [x] Create plugin infrastructure while keeping core widgets built-in
+  - [x] Design DeskViz.Plugins assembly with IWidgetPlugin interface
+  - [x] Keep core widgets (CPU, RAM, GPU, Clock, Logo) in main assembly
+  - [x] Create plugin loading mechanism via reflection (WidgetDiscoveryService)
+  - [x] Implement widget manifest/metadata system (IWidgetMetadata)
+- [ ] Develop proof-of-concept plugin widget
+  - [ ] Create sample Camera widget as separate DLL
+  - [ ] Test dynamic loading and unloading
+  - [ ] Verify service injection works across DLL boundaries
+- [ ] Security and distribution preparation
+  - [ ] Implement DLL signing for widget authenticity
+  - [ ] Create widget package format (.dwp - DeskViz Widget Package)
+  - [ ] Add plugin sandboxing/permissions system
+  - [ ] Design widget marketplace API
+- [ ] Developer experience
+  - [ ] Create Visual Studio widget template
+  - [ ] Widget debugging tools
+  - [ ] Sample widgets and documentation
+  - [ ] Widget submission guidelines
+
+## Phase 5: Advanced Features
 - [ ] Implement drag-and-drop support for widget reordering
-- [ ] Add widget visibility toggling
+- [x] Add widget visibility toggling
 - [ ] Create custom layout persistence
 - [x] Add system tray icon with quick actions
   - [x] Create notification area (system tray) icon using app icon
@@ -66,44 +98,39 @@
 - [ ] Support third-party widget themes
 - [ ] Create a widget update mechanism
 
-## Phase 5: Media Control Widget
-- [ ] Research Windows Media Session Manager (SMTC) integration
-- [ ] Create Windows Media Control service for session management
-- [ ] Implement media playback detection (current playing song/app)
-- [ ] Create media control widget UI with touch-friendly design
-- [ ] Add play/pause/stop/skip controls
-- [ ] Implement volume slider with touch support
-- [ ] Add now playing display (title, artist, album art)
-- [ ] Support multiple media sessions (Spotify, YouTube, etc.)
-- [ ] Add media widget settings for layout and controls
-- [ ] Handle media session changes and state updates
+## Phase 6: Media Control Widget
+- [x] Research Windows Media Session Manager (SMTC) integration
+- [x] Create Windows Media Control service for session management
+- [x] Implement media playback detection (current playing song/app)
+- [x] Create media control widget UI with touch-friendly design
+- [x] Add play/pause/stop/skip controls
+- [x] Implement volume slider with touch support
+- [x] Add now playing display (title, artist, album art)
+- [x] Support multiple media sessions (Spotify, YouTube, etc.)
+- [x] Add media widget settings for layout and controls
+- [x] Handle media session changes and state updates
 
 ## Current Priority Tasks
+- [ ] Fix CPU widget power and clock speed display issues
+  - [ ] Ensure clock speed shows in GHz with proper formatting
+  - [ ] Investigate why power usage shows 0 (may be hardware limitation)
+  - [ ] Add fallback UI when sensors unavailable
 - [ ] Implement proper multi-monitor fullscreen support
-- [ ] Replace PowerShell/WMI with LibreHardwareMonitor for system monitoring
-- [ ] Design main dashboard UI
-- [x] Implement basic CPU widget
-- [x] Improve CPU widget UI with animated progress bars
-- [x] Enhance CPU widget with temperature display options and additional metrics
-- [ ] Create a plugin architecture proof-of-concept
-- [x] Fix context menu issue
-- [x] Right-click context menu for widget configuration
-- [x] Implement actual widget configuration logic (opening settings window/dialog)
 - [ ] Refine widget layout and appearance (padding, margins, alignment)
 - [ ] Error handling for hardware monitoring failures
 - [ ] Add tooltips for clarity
 - [ ] Improve Settings window UI/UX
-- [ ] Save/Load widget positions
 - [ ] Ensure proper disposal of resources (e.g., hardware monitor)
 - [ ] Code cleanup and documentation
-- [ ] Start Media Control widget implementation (Phase 5)
 
 ## Working Features
 *   CPU Widget: Displays basic CPU info (Name, Usage %, Core count, Core usage bars).
 *   CPU Widget Settings: Allows toggling core visibility.
 *   Clock Widget: Displays current time.
 *   Logo Widget: Displays logo, configurable image path.
-*   Settings System: Loads/saves settings (Display, Fullscreen, Widget Visibility/Order).
+*   HardDrive Widget: Displays disk usage information with settings dialog.
+*   Media Control Widget: Play/pause/stop/skip controls, volume slider, now playing display (title, artist, album art), supports multiple media sessions (Spotify, YouTube, etc.).
+*   Settings System: Loads/saves settings (Display, Fullscreen, Widget Visibility/Order, Pages, Auto-Rotation).
 *   Basic Window Management: Moves to selected screen, basic fullscreen.
 *   RAM Widget: Displays basic RAM info (Total, Used, Free, Usage Bar).
 *   RAM Widget Settings (Page File Toggle): Allows toggling Page File info visibility.
@@ -112,11 +139,38 @@
 *   Context Menus: Right-click on widgets to open their configuration dialogs.
 *   System Tray: Minimize to tray, double-click to show/hide, context menu with Settings/About/Exit options.
 *   About Window: Displays application version, copyright, and system information.
+*   Multi-Page System: Swipeable PagedWidgetContainer with touch/mouse support, page indicators, smooth animations, keyboard navigation (arrow keys, Page Up/Down), swipe-down page selector overlay, add/remove/rename pages via settings, per-page widget lists and visibility.
+*   Auto-Rotation: Configurable automatic page rotation with interval and mode settings.
+*   Plugin Architecture: DeskViz.Plugins assembly with IWidgetPlugin interface, plugin discovery and loading via reflection (WidgetDiscoveryService), widget metadata system (IWidgetMetadata), plugin widget wrapper for integration with core app.
 
 ## Theming/Styling
 *   Add padding/margin between widgets for better visual separation.
 
-## Notes
+## Implementation Notes
+
+### Multi-Page System Architecture
+- Each page is a separate widget container with its own widget list
+- Pages stored as: `Dictionary<string, PageConfig>` where PageConfig contains:
+  * Page name/ID
+  * Widget list and order
+  * Page-specific settings (background, theme, etc.)
+- Swipe detection using WPF touch events or mouse drag
+- Use `TranslateTransform` for smooth page transitions
+- Consider using `FlipView` control pattern or custom implementation
+
+### Widget Architecture Evolution
+1. **Phase 1 (Current)**: Monolithic - all widgets in main assembly
+2. **Phase 2 (Multi-page)**: Same architecture but with page management
+3. **Phase 3 (Hybrid)**: Core widgets built-in, plugin system ready
+4. **Phase 4 (Full plugin)**: Gradual migration of widgets to plugins
+
+### Page Navigation Gestures
+- Horizontal swipe: Change pages
+- Vertical swipe from top: Show page selector
+- Pinch: Show all pages overview (optional)
+- Double-tap: Widget-specific action
+
+## Technical Notes
 - For multi-monitor detection, use System.Windows.Forms.Screen class
 - For fullscreen window handling, use WPF window properties (WindowStyle, ResizeMode, etc.)
 - ~~For system monitoring, use System.Diagnostics.PerformanceCounter~~ Use LibreHardwareMonitor instead for more accurate and comprehensive hardware monitoring

@@ -1,45 +1,72 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+## .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.user
+*.suo
+*.cache
+*.rsuser
+*.userosscache
+*.sln.docstates
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
+# Build outputs
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.binlog
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Test results
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+# Plugin build output
+WidgetOutput/
+
+# IDE
+.idea/
+*.sln.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Rider
+*.sln.iml
+
+# JetBrains
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# macOS
+.DS_Store
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
+# Windows
+Thumbs.db
+nul
 
-# Symbolication related
-app.*.symbols
+# Temp/debug files
+temp_output.txt
+app_pid.txt
+*.tmp
 
-# Obfuscation related
-app.*.map.json
+# AI tool settings
+.claude/settings.local.json
+.windsurfrules
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Build/release artifacts
+publish-output/
+installer-output/
+widgets.zip

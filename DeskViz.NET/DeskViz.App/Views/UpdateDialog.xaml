@@ -1,0 +1,116 @@
+<Window x:Class="DeskViz.App.Views.UpdateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="DeskViz Update Available"
+        Height="500"
+        Width="520"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style x:Key="AccentButton" TargetType="Button">
+            <Setter Property="Background" Value="#4FC3F7"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#4FC3F7"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2A2A2A" Padding="20,16">
+            <StackPanel>
+                <TextBlock Text="Update Available" FontSize="22" FontWeight="Bold"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="Current version: " Foreground="#B0B0B0" FontSize="13"/>
+                    <TextBlock x:Name="CurrentVersionText" Text="0.0.0" Foreground="#B0B0B0" FontSize="13" FontWeight="SemiBold"/>
+                    <TextBlock Text="  ->  " Foreground="#666666" FontSize="13"/>
+                    <TextBlock x:Name="NewVersionText" Text="0.0.0" Foreground="#4FC3F7" FontSize="13" FontWeight="SemiBold"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Update components checkboxes -->
+        <StackPanel Grid.Row="1" Margin="20,12,20,0">
+            <TextBlock Text="Update Components" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <CheckBox x:Name="AppUpdateCheckBox" Content="Application (DeskViz.App.exe)"
+                      Foreground="LightGray" Margin="0,0,0,4" FontSize="13"/>
+            <CheckBox x:Name="WidgetUpdateCheckBox" Content="Widgets (widgets.zip)"
+                      Foreground="LightGray" FontSize="13"/>
+        </StackPanel>
+
+        <!-- Release notes -->
+        <Grid Grid.Row="2" Margin="20,12,20,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Release Notes" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <Border Grid.Row="1" Background="#2A2A2A" CornerRadius="4" Padding="2">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="ReleaseNotesText"
+                               TextWrapping="Wrap"
+                               Foreground="#D0D0D0"
+                               FontSize="12.5"
+                               LineHeight="18"
+                               Padding="10"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Progress area -->
+        <StackPanel Grid.Row="3" x:Name="ProgressPanel" Margin="20,12,20,0" Visibility="Collapsed">
+            <TextBlock x:Name="StatusText" Text="Preparing update..." Foreground="#B0B0B0" FontSize="12" Margin="0,0,0,4"/>
+            <ProgressBar x:Name="DownloadProgress" Height="18" Minimum="0" Maximum="100" Value="0"
+                         Background="#333333" Foreground="#4FC3F7" BorderBrush="#555555"/>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <Border Grid.Row="5" Background="#2A2A2A" Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" x:Name="RemindLaterButton" Content="Remind Me Later"
+                        Style="{StaticResource SecondaryButton}" Click="RemindLater_Click"/>
+
+                <Button Grid.Column="2" x:Name="SkipButton" Content="Skip This Version"
+                        Style="{StaticResource SecondaryButton}" Click="SkipVersion_Click" Margin="0,0,8,0"/>
+
+                <Button Grid.Column="3" x:Name="UpdateNowButton" Content="Update Now"
+                        Style="{StaticResource AccentButton}" Click="UpdateNow_Click" IsDefault="True"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

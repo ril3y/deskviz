@@ -2,10 +2,12 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
+using DeskViz.App.Services;
 using DeskViz.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace DeskViz.App.Widgets.GpuWidget
 {
@@ -14,9 +16,10 @@ namespace DeskViz.App.Widgets.GpuWidget
     /// </summary>
     public partial class GpuWidget : System.Windows.Controls.UserControl, IWidget, INotifyPropertyChanged
     {
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<GpuWidget>();
         private readonly IHardwareMonitorService _hardwareMonitorService;
-        private readonly SettingsService _settingsService;
-        private readonly DispatcherTimer _updateTimer;
+        private readonly IHardwarePollingService _hardwarePollingService;
+        private readonly ISettingsService _settingsService;
 
         // IWidget implementation
         public string WidgetId => "GpuWidget";
@@ -173,8 +176,9 @@ namespace DeskViz.App.Widgets.GpuWidget
                 if (_isCelsius != value)
                 {
                     _isCelsius = value;
-                    // Update the static property in the converter (inverse because IsCelsius vs UseFahrenheit)
-                    Converters.TemperatureToStringConverter.UseFahrenheit = !value;
+                    // Update the instance converter for this widget
+                    if (Resources["TempToString"] is Converters.TemperatureToStringConverter conv)
+                        conv.UseFahrenheit = !value;
                     OnPropertyChanged();
                     SaveSettings();
                 }
@@ -191,7 +195,6 @@ namespace DeskViz.App.Widgets.GpuWidget
                 {
                     _updateInterval = value;
                     OnPropertyChanged();
-                    _updateTimer.Interval = TimeSpan.FromSeconds(value);
                     SaveSettings();
                 }
             }
@@ -226,9 +229,10 @@ namespace DeskViz.App.Widgets.GpuWidget
             }
         }
 
-        public GpuWidget(IHardwareMonitorService hardwareMonitorService, SettingsService settingsService)
+        public GpuWidget(IHardwareMonitorService hardwareMonitorService, IHardwarePollingService hardwarePollingService, ISettingsService settingsService)
         {
             _hardwareMonitorService = hardwareMonitorService ?? throw new ArgumentNullException(nameof(hardwareMonitorService));
+            _hardwarePollingService = hardwarePollingService ?? throw new ArgumentNullException(nameof(hardwarePollingService));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
             InitializeComponent();
@@ -238,19 +242,18 @@ namespace DeskViz.App.Widgets.GpuWidget
 
             // Load available GPUs
             var gpuTuples = _hardwareMonitorService.GetAvailableGpus();
-            AvailableGpus = gpuTuples.Select(gpu => new GpuInfo 
-            { 
-                Index = gpu.Index, 
-                Name = gpu.Name, 
-                Type = gpu.Type 
+            AvailableGpus = gpuTuples.Select(gpu => new GpuInfo
+            {
+                Index = gpu.Index,
+                Name = gpu.Name,
+                Type = gpu.Type
             }).ToList();
 
-            _updateTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(_updateInterval)
-            };
-            _updateTimer.Tick += UpdateTimer_Tick;
-            _updateTimer.Start();
+            // Subscribe to centralized hardware polling
+            _hardwarePollingService.DataUpdated += OnHardwareDataUpdated;
+
+            // Unsubscribe when widget is unloaded
+            Unloaded += OnWidgetUnloaded;
 
             // Initial data load
             RefreshData();
@@ -268,8 +271,9 @@ namespace DeskViz.App.Widgets.GpuWidget
             UpdateInterval = settings.GpuUpdateInterval;
             SelectedGpuIndex = settings.GpuSelectedIndex;
             
-            // Initialize the converter's static property
-            Converters.TemperatureToStringConverter.UseFahrenheit = !IsCelsius;
+            // Initialize the instance converter for this widget
+            if (Resources["TempToString"] is Converters.TemperatureToStringConverter conv)
+                conv.UseFahrenheit = !IsCelsius;
         }
 
         private void SaveSettings()
@@ -292,17 +296,22 @@ namespace DeskViz.App.Widgets.GpuWidget
             _settingsService.SaveSettings();
         }
 
-        private void UpdateTimer_Tick(object? sender, EventArgs e)
+        private async void OnHardwareDataUpdated(object? sender, EventArgs e)
         {
-            RefreshData();
+            await RefreshDataAsync();
         }
 
-        public void RefreshData()
+        private void OnWidgetUnloaded(object sender, RoutedEventArgs e)
+        {
+            _hardwarePollingService.DataUpdated -= OnHardwareDataUpdated;
+        }
+
+        public Task RefreshDataAsync()
         {
             try
             {
-                // Update hardware data
-                _hardwareMonitorService.Update();
+                // Read cached values from the hardware monitor service
+                // (The centralized polling service handles the updates)
 
                 // Get GPU name for selected GPU
                 GpuName = _hardwareMonitorService.GetGpuName(SelectedGpuIndex);
@@ -330,8 +339,16 @@ namespace DeskViz.App.Widgets.GpuWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing GPU data: {ex.Message}");
+                _logger.LogError(ex, $"Error refreshing GPU data: {ex.Message}");
             }
+
+            return Task.CompletedTask;
+        }
+
+        public void RefreshData()
+        {
+            // Fire and forget for backwards compatibility
+            _ = RefreshDataAsync();
         }
 
         public void OpenWidgetSettings()

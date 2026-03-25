@@ -13,10 +13,10 @@ namespace DeskViz.App.Controls
         // Dependency Property for the value we bind to
         public static readonly DependencyProperty AnimatedValueProperty =
             DependencyProperty.Register(
-                nameof(AnimatedValue), 
-                typeof(double), 
-                typeof(AnimatedProgressBar), 
-                new PropertyMetadata(0.0, OnAnimatedValueChanged)); // Default value 0.0, Callback on change
+                nameof(AnimatedValue),
+                typeof(double),
+                typeof(AnimatedProgressBar),
+                new PropertyMetadata(0.0, OnAnimatedValueChanged));
 
         /// <summary>
         /// Gets or sets the value that the ProgressBar should animate towards.
@@ -28,8 +28,29 @@ namespace DeskViz.App.Controls
             set { SetValue(AnimatedValueProperty, value); }
         }
 
-        // Animation duration (can be made a Dependency Property later if needed)
-        private static readonly Duration _animationDuration = new Duration(TimeSpan.FromMilliseconds(300));
+        // Dependency Property for animation duration
+        public static readonly DependencyProperty AnimationDurationProperty =
+            DependencyProperty.Register(
+                nameof(AnimationDuration),
+                typeof(double),
+                typeof(AnimatedProgressBar),
+                new PropertyMetadata(500.0)); // Default 500ms for smooth transitions
+
+        /// <summary>
+        /// Gets or sets the animation duration in milliseconds.
+        /// Set to 0 for instant updates (no animation) - useful when using external interpolation.
+        /// </summary>
+        public double AnimationDuration
+        {
+            get { return (double)GetValue(AnimationDurationProperty); }
+            set { SetValue(AnimationDurationProperty, value); }
+        }
+
+        // Shared easing function for smooth, natural-feeling animations
+        private static readonly IEasingFunction _easingFunction = new CubicEase
+        {
+            EasingMode = EasingMode.EaseOut // Starts fast, slows down at end - feels responsive
+        };
 
         /// <summary>
         /// Callback function triggered when the AnimatedValue property changes.
@@ -38,15 +59,24 @@ namespace DeskViz.App.Controls
         {
             if (d is AnimatedProgressBar progressBar && e.NewValue is double newValue)
             {
-                // Create the animation
-                var animation = new DoubleAnimation
+                // If duration is 0, update instantly without animation (for external interpolation)
+                if (progressBar.AnimationDuration <= 0)
                 {
-                    To = newValue,
-                    Duration = _animationDuration
-                };
+                    progressBar.Value = newValue;
+                }
+                else
+                {
+                    // Create the animation with easing for smooth, fluid motion
+                    var animation = new DoubleAnimation
+                    {
+                        To = newValue,
+                        Duration = new Duration(TimeSpan.FromMilliseconds(progressBar.AnimationDuration)),
+                        EasingFunction = _easingFunction
+                    };
 
-                // Apply the animation to the base Value property
-                progressBar.BeginAnimation(System.Windows.Controls.ProgressBar.ValueProperty, animation);
+                    // Apply the animation to the base Value property
+                    progressBar.BeginAnimation(System.Windows.Controls.ProgressBar.ValueProperty, animation);
+                }
             }
         }
     }

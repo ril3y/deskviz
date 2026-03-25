@@ -19,7 +19,8 @@
                                  Maximum="{Binding ElementName=Root, Path=Maximum}"
                                  Foreground="{Binding ElementName=Root, Path=ProgressBrush}"
                                  Background="{Binding ElementName=Root, Path=BackgroundBrush}"
-                                 AnimatedValue="{Binding ElementName=Root, Path=Value}"/>
+                                 AnimatedValue="{Binding ElementName=Root, Path=Value}"
+                                 AnimationDuration="{Binding ElementName=Root, Path=AnimationDuration}"/>
 
         <TextBlock Grid.Column="1"
                    x:Name="PercentageText"

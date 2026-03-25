@@ -7,7 +7,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using DeskViz.App.Services;
 using DeskViz.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace DeskViz.App.Widgets.MediaControlWidget
 {
@@ -17,8 +19,9 @@ namespace DeskViz.App.Widgets.MediaControlWidget
     public partial class MediaControlWidget : System.Windows.Controls.UserControl, IWidget, INotifyPropertyChanged
     {
         private readonly IMediaControlService _mediaControlService;
-        private readonly SettingsService _settingsService;
+        private readonly ISettingsService _settingsService;
         private readonly DispatcherTimer _updateTimer;
+        private readonly ILogger _logger = AppLoggerFactory.CreateLogger<MediaControlWidget>();
 
         // IWidget implementation
         public string WidgetId => "MediaControlWidget";
@@ -191,7 +194,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
         public Visibility SubtitleVisibility => ShowSubtitle ? Visibility.Visible : Visibility.Collapsed;
         public Visibility HeaderVisibility => (ShowTitle || ShowSubtitle) ? Visibility.Visible : Visibility.Collapsed;
 
-        public MediaControlWidget(IMediaControlService mediaControlService, SettingsService settingsService)
+        public MediaControlWidget(IMediaControlService mediaControlService, ISettingsService settingsService)
         {
             _mediaControlService = mediaControlService ?? throw new ArgumentNullException(nameof(mediaControlService));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -228,7 +231,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
                 var success = await _mediaControlService.InitializeAsync();
                 if (success)
                 {
-                    System.Diagnostics.Debug.WriteLine("Media control service initialized successfully.");
+                    _logger.LogDebug("Media control service initialized successfully.");
                     
                     // Initialize volume with current system volume
                     Volume = _mediaControlService.GetVolume();
@@ -242,14 +245,14 @@ namespace DeskViz.App.Widgets.MediaControlWidget
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("Failed to initialize media control service.");
+                    _logger.LogWarning("Failed to initialize media control service.");
                     Title = "Media Control Unavailable";
                     AppName = "Initialization Failed";
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error initializing media service: {ex.Message}");
+                _logger.LogError($"Error initializing media service: {ex.Message}");
                 Title = "Media Control Error";
                 AppName = "Service Error";
             }
@@ -290,7 +293,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing media data: {ex.Message}");
+                _logger.LogError($"Error refreshing media data: {ex.Message}");
             }
         }
 
@@ -370,7 +373,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading album art: {ex.Message}");
+                _logger.LogError($"Error loading album art: {ex.Message}");
                 AlbumArtSource = null;
             }
         }
@@ -402,7 +405,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in play/pause: {ex.Message}");
+                _logger.LogError($"Error in play/pause: {ex.Message}");
             }
         }
 
@@ -414,7 +417,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in stop: {ex.Message}");
+                _logger.LogError($"Error in stop: {ex.Message}");
             }
         }
 
@@ -426,7 +429,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in previous: {ex.Message}");
+                _logger.LogError($"Error in previous: {ex.Message}");
             }
         }
 
@@ -438,7 +441,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in next: {ex.Message}");
+                _logger.LogError($"Error in next: {ex.Message}");
             }
         }
 
@@ -456,7 +459,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in volume mouse down: {ex.Message}");
+                _logger.LogError($"Error in volume mouse down: {ex.Message}");
             }
         }
 
@@ -471,7 +474,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in volume mouse move: {ex.Message}");
+                _logger.LogError($"Error in volume mouse move: {ex.Message}");
             }
         }
 
@@ -485,7 +488,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in volume mouse up: {ex.Message}");
+                _logger.LogError($"Error in volume mouse up: {ex.Message}");
             }
         }
 
@@ -505,7 +508,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error updating volume from mouse: {ex.Message}");
+                _logger.LogError($"Error updating volume from mouse: {ex.Message}");
             }
         }
 
@@ -521,7 +524,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error updating volume progress: {ex.Message}");
+                _logger.LogError($"Error updating volume progress: {ex.Message}");
             }
         }
 
@@ -534,12 +537,12 @@ namespace DeskViz.App.Widgets.MediaControlWidget
                 {
                     ProgressPercent = e.NewValue;
                     // TODO: Implement seek functionality when media service supports it
-                    System.Diagnostics.Debug.WriteLine($"Seek to: {e.NewValue}%");
+                    _logger.LogDebug($"Seek to: {e.NewValue}%");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error seeking: {ex.Message}");
+                _logger.LogError($"Error seeking: {ex.Message}");
             }
         }
 
@@ -570,7 +573,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error saving media control settings: {ex.Message}");
+                _logger.LogError($"Error saving media control settings: {ex.Message}");
             }
         }
 
@@ -596,7 +599,7 @@ namespace DeskViz.App.Widgets.MediaControlWidget
             catch (Exception ex)
             {
                 _isLoadingSettings = false;
-                System.Diagnostics.Debug.WriteLine($"Error loading media control settings: {ex.Message}");
+                _logger.LogError($"Error loading media control settings: {ex.Message}");
             }
         }
 
